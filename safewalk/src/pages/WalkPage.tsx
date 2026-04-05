@@ -5,31 +5,55 @@ import MapPlaceholder from "../components/MapPlaceHolder";
 
 const UPDATE_INTERVAL_MS = 10_000;
 
+// Simple fake ETA calculation (distance in km / average speed km/h)
+const calculateETA = (distanceKm: number, avgSpeedKmh = 5): string => {
+  const minutes = Math.round((distanceKm / avgSpeedKmh) * 60);
+  return `${minutes} min`;
+};
+
 function WalkPage() {
   const [walk, setWalk] = useState<WalkState>({
     status: "inactive",
     isActive: false,
     lastUpdate: null,
+    destination: null, // new field for Slice 2
   });
 
+  const [distanceToDestination, setDistanceToDestination] = useState<number>(0);
+  const [eta, setEta] = useState<string | null>(null);
+
+  // 10-second update interval
   useEffect(() => {
     if (!walk.isActive) return;
 
     const id = setInterval(() => {
       setWalk((prev) => ({ ...prev, lastUpdate: new Date() }));
+
+      if (walk.destination) {
+        const fakeDistance = Math.max(distanceToDestination - 0.05, 0); // decrement 50m
+        setDistanceToDestination(fakeDistance);
+        setEta(calculateETA(fakeDistance));
+      }
     }, UPDATE_INTERVAL_MS);
 
+    // initial timestamp
     setWalk((prev) => ({ ...prev, lastUpdate: new Date() }));
 
     return () => clearInterval(id);
-  }, [walk.isActive]);
+  }, [walk.isActive, walk.destination, distanceToDestination]);
 
   const handleStart = () => {
-    setWalk({
+    setWalk((prev) => ({
+      ...prev,
       status: "active",
       isActive: true,
-      lastUpdate: null,
-    });
+      lastUpdate: new Date(),
+    }));
+
+    if (walk.destination) {
+      setDistanceToDestination(2); // fake initial distance in km
+      setEta(calculateETA(2));
+    }
   };
 
   const handleEnd = () => {
@@ -37,7 +61,10 @@ function WalkPage() {
       status: "inactive",
       isActive: false,
       lastUpdate: null,
+      destination: null,
     });
+    setDistanceToDestination(0);
+    setEta(null);
   };
 
   const isActive = walk.isActive;
@@ -68,6 +95,24 @@ function WalkPage() {
             <div className="sw-walk-meta-label">Mock update window</div>
             <div className="sw-walk-meta-value">Every 10 seconds</div>
           </div>
+        </div>
+
+        {/* Slice 2: Destination Input */}
+        <div className="sw-walk-meta-row" style={{ marginTop: "0.75rem" }}>
+          <input
+            type="text"
+            placeholder="Enter destination (optional)"
+            value={walk.destination ?? ""}
+            disabled={isActive}
+            onChange={(e) =>
+              setWalk((prev) => ({
+                ...prev,
+                destination: e.target.value || null,
+              }))
+            }
+            className="sw-walk-destination-input"
+          />
+          {eta && <p className="sw-walk-meta-value">ETA: {eta}</p>}
         </div>
 
         <div className="sw-walk-actions">
@@ -102,9 +147,8 @@ function WalkPage() {
       <MapPlaceholder isActive={walk.isActive} lastUpdate={walk.lastUpdate} />
 
       <p className="sw-walk-footnote">
-        This first slice covers your basic Walk Mode session: start, mock
-        10‑second updates, and end. It matches a small part of your MVP
-        requirements so you can iterate vertically from here.
+        Now supports optional destination and ETA calculation. Walk works with
+        or without a destination.
       </p>
     </div>
   );

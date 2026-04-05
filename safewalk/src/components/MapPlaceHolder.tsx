@@ -1,3 +1,5 @@
+import '../styles/Components.css';
+
 interface Props {
   isActive: boolean;
   lastUpdate: Date | null;
@@ -6,11 +8,13 @@ interface Props {
 function MapPlaceholder({ isActive, lastUpdate }: Props) {
   return (
     <section className="sw-map-card">
+    
       <div className="sw-map-card-header">
         <div>
           <p className="sw-map-label">Live route preview</p>
           <p className="sw-map-title">Map coming soon</p>
         </div>
+
         <div className="sw-map-status">
           <div>{isActive ? "Tracking enabled" : "Tracking paused"}</div>
           <div className="sw-map-status-sub">
@@ -23,7 +27,7 @@ function MapPlaceholder({ isActive, lastUpdate }: Props) {
       <div className="sw-map-viewport">
         <div className="sw-map-viewport-inner">
           <div className="sw-map-viewport-pill">
-            We’ll draw your real route and live location here.
+            <p>We’ll draw your real route and live location here.</p>
           </div>
         </div>
 
