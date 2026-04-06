@@ -6,6 +6,7 @@ import "./index.css";
 import "./styles/App.css";
 import "./styles/WalkPage.css";
 import "./styles/Components.css";
+import 'leaflet/dist/leaflet.css';
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

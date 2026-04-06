@@ -1,3 +1,5 @@
+@import url("https://unpkg.com/leaflet/dist/leaflet.css");
+
 :root {
   color-scheme: dark;
 }

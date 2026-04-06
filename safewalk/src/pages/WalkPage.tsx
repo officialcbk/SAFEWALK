@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import type { WalkState } from "../types/walk";
 import StatusBadge from "../components/StatusBadge";
 import MapPlaceholder from "../components/MapPlaceHolder";
+import MapView from "../components/MapView";
+
+<MapView walk={walk} />
 
 const UPDATE_INTERVAL_MS = 10_000;
 
