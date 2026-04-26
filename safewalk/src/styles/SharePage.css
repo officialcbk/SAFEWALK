@@ -1,0 +1,144 @@
+/* ─── Share page styles ───────────────────────────────────────────────────────
+   Slice 12 – trusted contact web view: mobile-first read-only tracking page */
+
+.sw-share-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.sw-share-card {
+  border-radius: 28px;
+  padding: 1.5rem 1.4rem;
+  background: radial-gradient(
+      circle at top right,
+      rgba(59, 130, 246, 0.1),
+      transparent 55%
+    ),
+    rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(51, 65, 85, 0.9);
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.95);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Header */
+.sw-share-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.sw-share-avatar {
+  font-size: 2.6rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.sw-share-name {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 0.25rem 0 0;
+  line-height: 1.2;
+}
+
+.sw-share-subtitle {
+  font-size: 0.8rem;
+  color: rgba(148, 163, 184, 0.9);
+  margin-top: 0.28rem;
+}
+
+/* Data grid */
+.sw-share-data-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+}
+
+.sw-share-data-cell {
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(51, 65, 85, 0.45);
+  border-radius: 12px;
+  padding: 0.7rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sw-share-data-value {
+  font-size: 0.87rem;
+  font-weight: 500;
+  font-family: monospace;
+  color: #f1f5f9;
+}
+
+/* Real Leaflet map wrapper (FR8.2) */
+.sw-share-map-wrapper {
+  border-radius: 20px;
+  overflow: hidden;
+  height: 260px;
+  position: relative;
+  border: 1px solid rgba(51, 65, 85, 0.7);
+}
+
+/* Floating caption over the map */
+.sw-share-map-caption {
+  position: absolute;
+  bottom: 0.65rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.68rem;
+  color: #f1f5f9;
+  background: rgba(2, 6, 23, 0.72);
+  padding: 0.22rem 0.75rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  z-index: 1000;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+
+/* Loading skeleton shown while Leaflet chunk loads */
+.sw-share-map-loading {
+  background: linear-gradient(135deg, #020617 0%, #111827 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.84rem;
+  color: rgba(148, 163, 184, 0.7);
+}
+
+/* Call button */
+.sw-share-call-btn {
+  text-align: center;
+  text-decoration: none;
+  display: block;
+}
+
+/* Expiry note */
+.sw-share-expiry-note {
+  font-size: 0.74rem;
+  color: rgba(100, 116, 139, 0.9);
+  text-align: center;
+  margin: 0;
+}
+
+/* Expired state */
+.sw-share-expired {
+  padding: 1rem;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.07);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  font-size: 0.84rem;
+  color: rgba(252, 165, 165, 0.9);
+  line-height: 1.5;
+}
+
+/* Loading state */
+.sw-share-loading {
+  font-size: 0.88rem;
+  color: rgba(148, 163, 184, 0.8);
+  text-align: center;
+  margin-top: 2rem;
+}
