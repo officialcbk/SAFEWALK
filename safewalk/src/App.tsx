@@ -1,104 +1,66 @@
-// ─── App shell ────────────────────────────────────────────────────────────────
-// Slice  1  – /walk route (baseline)
-// Slice 10  – /contacts route + nav link
-// Slice 12  – /share/:sessionId route (no nav link – public short URL)
-// Slice 15  – React.lazy code-splitting for all page chunks
-// Slice 16  – skip-to-content link, nav landmark roles
-// Slice 17  – /settings route + nav link
+import { lazy, Suspense } from 'react';
+import { Route, Routes, Navigate } from 'react-router-dom';
+import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { AppShell } from './components/layout/AppShell';
+import { FullPageSpinner } from './components/ui/Spinner';
 
-import { lazy, Suspense, useEffect } from "react";
-import { NavLink, Route, Routes } from "react-router-dom";
-import { ensureAnonymousAuth } from "./services/db";
-import "./styles/WalkPage.css"; // loads the shimmer + skip-link keyframes globally
+// Auth (public)
+const SignIn          = lazy(() => import('./pages/auth/SignIn'));
+const SignUp          = lazy(() => import('./pages/auth/SignUp'));
+const ForgotPassword  = lazy(() => import('./pages/auth/ForgotPassword'));
+const ResetPassword   = lazy(() => import('./pages/auth/ResetPassword'));
+const CheckEmail      = lazy(() => import('./pages/auth/CheckEmail'));
+const AuthCallback    = lazy(() => import('./pages/auth/AuthCallback'));
 
-// Lazy-load every page so the initial bundle stays small (Slice 15)
-const WalkPage     = lazy(() => import("./pages/WalkPage"));
-const ContactsPage = lazy(() => import("./pages/ContactsPage"));
-const SharePage    = lazy(() => import("./pages/SharePage"));
-const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+// Onboarding (protected, first-time only)
+const OnboardingFlow  = lazy(() => import('./pages/onboarding/OnboardingFlow'));
 
-/**
- * Minimal skeleton shown while a page chunk is loading.
- * Matches the sw-page-skeleton styles in WalkPage.css (Slice 15).
- */
-function PageSkeleton() {
+// Main app (protected)
+const Home            = lazy(() => import('./pages/Home'));
+const Contacts        = lazy(() => import('./pages/Contacts'));
+const History         = lazy(() => import('./pages/History'));
+const Settings        = lazy(() => import('./pages/Settings'));
+
+// Public share view
+const ContactWebView  = lazy(() => import('./pages/ContactWebView'));
+
+function Protected({ children }: { children: React.ReactNode }) {
   return (
-    <div className="sw-page-skeleton" aria-busy="true" aria-label="Loading page…">
-      <div className="sw-page-skeleton-bar sw-page-skeleton-bar--wide" />
-      <div className="sw-page-skeleton-bar" />
-      <div className="sw-page-skeleton-bar sw-page-skeleton-bar--short" />
-    </div>
+    <ProtectedRoute>
+      <AppShell>{children}</AppShell>
+    </ProtectedRoute>
   );
 }
 
-function App() {
-  useEffect(() => { ensureAnonymousAuth(); }, []);
-
+export default function App() {
   return (
-    <div className="sw-app">
-      {/* Skip link – lets keyboard users jump past the nav (Slice 16) */}
-      <a href="#sw-main-content" className="sw-skip-link">
-        Skip to main content
-      </a>
+    <Suspense fallback={<FullPageSpinner />}>
+      <Routes>
+        {/* Public auth routes */}
+        <Route path="/sign-in"          element={<SignIn />} />
+        <Route path="/sign-up"          element={<SignUp />} />
+        <Route path="/forgot-password"  element={<ForgotPassword />} />
+        <Route path="/reset-password"   element={<ResetPassword />} />
+        <Route path="/auth/check-email" element={<CheckEmail />} />
+        <Route path="/auth/callback"    element={<AuthCallback />} />
 
-      <header className="sw-header" role="banner">
-        <div className="sw-header-left">
-          <div className="sw-logo-orb" aria-hidden="true">
-            <div className="sw-logo-inner" />
-          </div>
-          <div className="sw-brand-text">
-            <div className="sw-brand-title">SafeWalk</div>
-            <div className="sw-brand-subtitle">Stay safer on every walk</div>
-          </div>
-        </div>
+        {/* Public trusted contact view */}
+        <Route path="/track/:token"     element={<ContactWebView />} />
 
-        {/* Primary navigation (Slice 10, 17) */}
-        <nav className="sw-nav" aria-label="Main navigation">
-          <NavLink
-            to="/walk"
-            className={({ isActive }) =>
-              isActive ? "sw-nav-link sw-nav-link--active" : "sw-nav-link"
-            }
-          >
-            Walk
-          </NavLink>
-          <NavLink
-            to="/contacts"
-            className={({ isActive }) =>
-              isActive ? "sw-nav-link sw-nav-link--active" : "sw-nav-link"
-            }
-          >
-            Contacts
-          </NavLink>
-          <NavLink
-            to="/settings"
-            className={({ isActive }) =>
-              isActive ? "sw-nav-link sw-nav-link--active" : "sw-nav-link"
-            }
-          >
-            Settings
-          </NavLink>
-        </nav>
-      </header>
+        {/* Onboarding (protected) */}
+        <Route path="/onboarding" element={
+          <ProtectedRoute><OnboardingFlow /></ProtectedRoute>
+        } />
 
-      <main className="sw-main" id="sw-main-content">
-        <div className="sw-main-inner">
-          {/* Suspense boundary with skeleton for lazy page loads (Slice 15) */}
-          <Suspense fallback={<PageSkeleton />}>
-            <Routes>
-              <Route path="/walk"                element={<WalkPage />}     />
-              <Route path="/contacts"            element={<ContactsPage />} />
-              {/* /share/:sessionId – public link, no nav entry (Slice 12) */}
-              <Route path="/share/:sessionId"    element={<SharePage />}    />
-              <Route path="/settings"            element={<SettingsPage />} />
-              {/* Default fallback */}
-              <Route path="*"                    element={<WalkPage />}     />
-            </Routes>
-          </Suspense>
-        </div>
-      </main>
-    </div>
+        {/* Protected main app */}
+        <Route path="/home"      element={<Protected><Home /></Protected>} />
+        <Route path="/contacts"  element={<Protected><Contacts /></Protected>} />
+        <Route path="/history"   element={<Protected><History /></Protected>} />
+        <Route path="/settings"  element={<Protected><Settings /></Protected>} />
+
+        {/* Default */}
+        <Route path="*" element={<Navigate to="/home" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
-
-export default App;

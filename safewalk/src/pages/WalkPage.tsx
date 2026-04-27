@@ -305,7 +305,7 @@ function WalkPage() {
           return;
         }
         destinationCoordsRef.current = coords;
-        setDestinationCoords(coords);
+        setDestinationCoords([coords[1], coords[0]]); // [lng, lat] for Mapbox
         // If walk is already active and GPS is available, fetch the route now
         if (isActiveRef.current && locationRef.current) {
           fetchRouteIfReady();
