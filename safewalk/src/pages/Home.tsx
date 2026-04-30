@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { differenceInSeconds, formatDuration, intervalToDuration } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useQuery } from '@tanstack/react-query';
-import { MapPin } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { useWalkStore } from '../store/walkStore';
@@ -12,16 +11,19 @@ import { useCheckIn } from '../hooks/useCheckIn';
 import { geocodeAddress, getWalkingRoute } from '../services/routing';
 import { haversineDistance, formatEta } from '../services/eta';
 import { MapView } from '../components/map/MapView';
-import { CheckInBar } from '../components/walk/CheckInBar';
 import { SosButton } from '../components/walk/SosButton';
-import { EscalationLadder } from '../components/sos/EscalationLadder';
 import { Avatar } from '../components/ui/Avatar';
-import { Button } from '../components/ui/Button';
-import { Badge } from '../components/ui/Badge';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import type { LatLng } from '../types';
 
-// ── Stats query ──────────────────────────────────────────────────────────────
+interface Suggestion {
+  id: string;
+  text: string;
+  place_name: string;
+  center: [number, number]; // [lng, lat]
+}
+
+// ── Stats query ───────────────────────────────────────────────────────────────
 function useHomeStats(userId: string | undefined) {
   return useQuery({
     queryKey: ['home-stats', userId],
@@ -40,9 +42,9 @@ function useHomeStats(userId: string | undefined) {
   });
 }
 
-// ── Session timer ────────────────────────────────────────────────────────────
+// ── Session timer ─────────────────────────────────────────────────────────────
 function useSessionTimer(startedAt: Date | null) {
-  const [elapsed, setElapsed] = useState('0:00:00');
+  const [elapsed, setElapsed] = useState('0:00');
   useEffect(() => {
     if (!startedAt) return;
     const id = setInterval(() => {
@@ -50,15 +52,47 @@ function useSessionTimer(startedAt: Date | null) {
       const h = Math.floor(secs / 3600);
       const m = Math.floor((secs % 3600) / 60);
       const s = secs % 60;
-      setElapsed(`${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
+      setElapsed(h > 0
+        ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+        : `${m}:${String(s).padStart(2, '0')}`
+      );
     }, 1000);
     return () => clearInterval(id);
   }, [startedAt]);
   return elapsed;
 }
 
-// ── Check-in overlay ─────────────────────────────────────────────────────────
-function CheckInOverlay({ onSafe, escalationStage }: { onSafe: () => void; escalationStage: number }) {
+// ── Logo badge (pill) ─────────────────────────────────────────────────────────
+function LogoBadge() {
+  return (
+    <div className="inline-flex items-center gap-2 bg-white rounded-full pl-2 pr-3.5 py-2 shadow-[0_2px_10px_rgba(0,0,0,0.08)]">
+      <div
+        className="w-7 h-7 rounded-[8px] flex items-center justify-center"
+        style={{ background: 'linear-gradient(135deg, #7F77DD, #534AB7)' }}
+        aria-hidden="true"
+      >
+        <svg viewBox="0 0 64 64" width={22} height={22}>
+          <circle cx="32" cy="32" r="24" fill="none" stroke="rgba(255,255,255,0.32)" strokeWidth="2.2"/>
+          <circle cx="32" cy="32" r="15" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2.2"/>
+          <circle cx="32" cy="32" r="6" fill="white"/>
+        </svg>
+      </div>
+      <span className="font-bold text-[14px] text-[#1A1A28] tracking-[-0.2px]">SafeWalk</span>
+    </div>
+  );
+}
+
+// ── Search icon ───────────────────────────────────────────────────────────────
+function SearchIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#888899" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
+    </svg>
+  );
+}
+
+// ── Check-in overlay ──────────────────────────────────────────────────────────
+function CheckInOverlay({ onSafe }: { onSafe: () => void; secondsLeft: number }) {
   const [count, setCount] = useState(30);
   useEffect(() => {
     const id = setInterval(() => setCount((c) => Math.max(0, c - 1)), 1000);
@@ -66,72 +100,140 @@ function CheckInOverlay({ onSafe, escalationStage }: { onSafe: () => void; escal
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col">
-      {/* Amber status bar */}
-      <div className="h-[22px] bg-[#FAEEDA] flex items-center px-4">
-        <span className="text-[9px] font-bold text-[#854F0B]">Check-in needed</span>
-      </div>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="checkin-title"
+      className="fixed inset-0 z-50 flex flex-col"
+      style={{ maxWidth: 430, margin: '0 auto' }}
+    >
+      {/* Dimmed map behind */}
+      <div className="flex-1 bg-black/40" />
 
-      {/* Top section */}
-      <div className="bg-[#FAEEDA] px-6 py-6 flex flex-col items-center gap-3">
-        <h2 className="text-[18px] font-bold text-[#1A1A28]">Are you okay?</h2>
-        <p className="text-[11px] text-[#854F0B] text-center leading-relaxed">
-          We haven't heard from you. Tap to confirm you're safe.
+      {/* Amber bottom sheet */}
+      <div className="bg-[#FAEEDA] rounded-[24px_24px_0_0] px-6 pb-8 pt-2 shadow-[0_-10px_40px_rgba(0,0,0,0.15)]">
+        <div className="w-11 h-1 bg-[#E8C088] rounded-full mx-auto mb-5" />
+
+        {/* Alert icon */}
+        <div
+          className="w-14 h-14 rounded-full flex items-center justify-center mb-3.5 mx-auto"
+          style={{ background: 'rgba(133,79,11,0.12)' }}
+          aria-hidden="true"
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#854F0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>
+            <path d="M12 9v4"/><path d="M12 17h.01"/>
+          </svg>
+        </div>
+
+        <h2 id="checkin-title" className="text-[22px] font-bold text-[#1A1A28] text-center mb-1.5 tracking-[-0.3px]">
+          Are you okay?
+        </h2>
+        <p className="text-[14px] text-[#854F0B] text-center mb-5">
+          Your contacts will be alerted after the countdown
         </p>
-        <p className="text-[32px] font-bold text-[#854F0B] tabular-nums" aria-live="polite">
+
+        {/* Countdown box */}
+        <div
+          className="w-20 h-16 rounded-[16px] flex items-center justify-center mx-auto mb-6 font-bold text-[32px] text-[#854F0B] tabular-nums"
+          style={{ background: 'rgba(133,79,11,0.10)' }}
+          aria-live="assertive"
+          aria-label={`${count} seconds remaining`}
+        >
           0:{String(count).padStart(2, '0')}
-        </p>
+        </div>
+
         <button
           onClick={onSafe}
-          className="w-full py-3 bg-[#E24B4A] text-white text-[12px] font-bold rounded-[50px] min-h-[48px]"
+          autoFocus
+          className="w-full h-[52px] rounded-[14px] bg-[#854F0B] text-white font-semibold text-[16px] transition-colors hover:bg-[#6a3e09] active:scale-[0.98]"
         >
           I'm okay
         </button>
-        <p className="text-[8px] text-[#854F0B]">Your contacts will be alerted if no response</p>
-      </div>
-
-      {/* Escalation ladder */}
-      <div className="flex-1 bg-white px-6 py-4 overflow-y-auto">
-        <div className="border-t border-[#E0E0E8] pt-4">
-          <p className="text-[10px] font-bold text-[#1A1A28] mb-3">Escalation ladder</p>
-          <EscalationLadder activeStage={escalationStage as 1} />
-        </div>
       </div>
     </div>
   );
 }
 
-// ── SOS overlay ──────────────────────────────────────────────────────────────
-function SosOverlay({ onCancel, escalationStage }: { onCancel: () => void; escalationStage: number }) {
+// ── SOS overlay ───────────────────────────────────────────────────────────────
+function SosOverlay({
+  onCancel,
+  contacts,
+}: {
+  onCancel: () => void;
+  contacts: Array<{ name: string; phone: string }>;
+}) {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col">
-      <div className="h-[22px] bg-[#FCEBEB] flex items-center px-4">
-        <span className="text-[9px] font-bold text-[#A32D2D]">EMERGENCY ACTIVE</span>
-      </div>
-      <div className="bg-[#FCEBEB] px-6 py-6 flex flex-col items-center gap-3">
-        {/* SOS circle */}
-        <div className="relative flex items-center justify-center" style={{ width: 104, height: 104 }}>
-          <div className="absolute w-[104px] h-[104px] rounded-full border-[3px] border-[#E24B4A]/30" />
-          <div className="absolute w-[88px] h-[88px] rounded-full border-[3px] border-[#E24B4A]/50" />
-          <div className="w-[72px] h-[72px] rounded-full bg-[#E24B4A] flex items-center justify-center z-10"
-            style={{ boxShadow: '0 0 0 0 #E24B4A44, 0 4px 24px rgba(226,75,74,0.5)' }}>
-            <span className="text-white font-bold text-[16px]">SOS</span>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="sos-title"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-between px-6 py-10"
+      style={{
+        maxWidth: 430,
+        margin: '0 auto',
+        background: 'linear-gradient(to bottom, #E24B4A 0%, #c03b3a 100%)',
+      }}
+    >
+      {/* Pulsing rings + SOS disc */}
+      <div className="flex flex-col items-center gap-4 mt-8">
+        <div className="relative flex items-center justify-center" style={{ width: 160, height: 160 }} aria-hidden="true">
+          {/* Outer ring */}
+          <div className="absolute w-[160px] h-[160px] rounded-full border-[2px] border-white/20 animate-[ping_2s_ease-out_infinite]" />
+          <div className="absolute w-[130px] h-[130px] rounded-full border-[2px] border-white/30 animate-[ping_2s_ease-out_0.5s_infinite]" />
+          {/* White disc */}
+          <div
+            className="w-[96px] h-[96px] rounded-full bg-white flex items-center justify-center z-10"
+            style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.25)' }}
+          >
+            <span className="text-[#E24B4A] font-bold text-[18px] tracking-[1px]">SOS</span>
           </div>
         </div>
-        <p className="text-[12px] font-bold text-[#A32D2D]">Emergency activated</p>
-        <p className="text-[9px] text-[#888899]">Alerting your contacts now</p>
+
+        <div className="text-center">
+          <p id="sos-title" className="text-[22px] font-bold text-white tracking-[-0.3px]">Emergency activated</p>
+          <p className="text-[14px] text-white/80 mt-1" aria-live="polite">Alerting your contacts now…</p>
+        </div>
+
+        {/* Contacts list */}
+        {contacts.length > 0 && (
+          <div className="w-full flex flex-col gap-2 mt-2">
+            {contacts.map((c) => (
+              <div key={c.phone} className="flex items-center justify-between bg-white/15 rounded-[14px] px-4 py-3">
+                <div>
+                  <div className="text-white font-semibold text-[14px]">{c.name}</div>
+                  <div className="text-white/70 text-[12px]">{c.phone}</div>
+                </div>
+                <div className="flex items-center gap-1.5 bg-white/20 rounded-full px-3 py-1">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M20 6 9 17l-5-5"/>
+                  </svg>
+                  <span className="text-white text-[11px] font-semibold">SMS sent</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Buttons */}
+      <div className="w-full flex flex-col gap-2.5">
         <button
           onClick={onCancel}
-          className="w-full py-3 bg-[#EAF3DE] text-[#3B6D11] text-[11px] font-bold rounded-[50px] min-h-[48px]"
+          autoFocus
+          className="w-full h-[52px] rounded-[14px] bg-white/20 text-white font-semibold text-[16px] border border-white/30 active:scale-[0.98]"
         >
-          I'm okay — Cancel SOS
+          Cancel SOS — I'm okay
         </button>
-      </div>
-      <div className="flex-1 bg-white px-6 py-4 overflow-y-auto">
-        <div className="border-t border-[#E0E0E8] pt-4">
-          <p className="text-[10px] font-bold text-[#1A1A28] mb-3">Escalation ladder</p>
-          <EscalationLadder activeStage={escalationStage as 2} />
-        </div>
+        <a
+          href="tel:911"
+          className="w-full h-[52px] rounded-[14px] bg-white flex items-center justify-center gap-2 font-semibold text-[16px] text-[#E24B4A]"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.6A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 2 .6 2.9a2 2 0 0 1-.5 2L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2-.5c1 .3 2 .5 2.9.6a2 2 0 0 1 1.7 2Z"/>
+          </svg>
+          Call 911
+        </a>
       </div>
     </div>
   );
@@ -149,30 +251,30 @@ export default function Home() {
   const stats = useHomeStats(user?.id);
   const timer = useSessionTimer(walk.startedAt ? new Date(walk.startedAt) : null);
 
-  const [showEndConfirm, setShowEndConfirm] = useState(false);
-  const [showCheckIn, setShowCheckIn]       = useState(false);
-  const [showSosOverlay, setShowSosOverlay] = useState(false);
+  const [showEndConfirm, setShowEndConfirm]   = useState(false);
+  const [showCheckIn, setShowCheckIn]         = useState(false);
+  const [showSosOverlay, setShowSosOverlay]   = useState(false);
+  const [sosContacts, setSosContacts]         = useState<Array<{ name: string; phone: string }>>([]);
   const [destinationText, setDestinationText] = useState(walk.destination ?? '');
   const [eta, setEta]                         = useState<string | null>(
     walk.distanceMeters > 0 ? formatEta(walk.distanceMeters) : null
   );
   const [currentLoc, setCurrentLoc]           = useState<LatLng | null>(walk.currentLocation);
 
-  const geocodeTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // destCoordsRef mirrors the store's destinationCoords for use in callbacks
-  const destCoordsRef = useRef<[number, number] | null>(destinationCoords);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+
+  const geocodeTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suggestionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const destCoordsRef   = useRef<[number, number] | null>(destinationCoords);
   const routeLoaded   = useRef(!!routeCoords);
   const locRef        = useRef<LatLng | null>(null);
   const isActiveRef   = useRef(false);
 
   isActiveRef.current = !!walk.sessionId;
 
-  // Keep ref in sync with store (survives re-renders without stale closures)
-  useEffect(() => {
-    destCoordsRef.current = destinationCoords;
-  }, [destinationCoords]);
+  useEffect(() => { destCoordsRef.current = destinationCoords; }, [destinationCoords]);
 
-  // Re-start GPS if Home remounts during an active walk (user switched tabs)
+  // Re-start GPS if Home remounts during an active walk (tab switch recovery)
   useEffect(() => {
     if (walk.sessionId) startTracking();
     return () => stopTracking();
@@ -192,7 +294,6 @@ export default function Home() {
       setEta(formatEta(dist));
     }
 
-    // Fetch route on first GPS fix (skip if already loaded and stored)
     if (destCoordsRef.current && !routeLoaded.current) {
       routeLoaded.current = true;
       getWalkingRoute([ll.lat, ll.lng], [destCoordsRef.current[1], destCoordsRef.current[0]]).then((r) => {
@@ -200,15 +301,11 @@ export default function Home() {
       });
     }
 
-    // Push ping to Supabase (fire-and-forget)
     if (walk.sessionId) {
       supabase.from('location_pings').insert({
-        session_id: walk.sessionId,
-        user_id:    user?.id,
-        lat:        location.lat,
-        lng:        location.lng,
-        bearing:    location.bearing,
-        speed:      location.speed,
+        session_id: walk.sessionId, user_id: user?.id,
+        lat: location.lat, lng: location.lng,
+        bearing: location.bearing, speed: location.speed,
       });
     }
   }, [location, walk.sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -227,7 +324,6 @@ export default function Home() {
     geocodeTimer.current = setTimeout(async () => {
       const coords = await geocodeAddress(value.trim());
       if (!coords) return;
-      // coords = [lat, lng] → mapbox wants [lng, lat]
       const mapboxCoords: [number, number] = [coords[1], coords[0]];
       destCoordsRef.current = mapboxCoords;
       setDestinationCoords(mapboxCoords);
@@ -240,30 +336,65 @@ export default function Home() {
     }, 1000);
   }, [setDestination, setRouteCoords, setDestinationCoords]);
 
+  // Address autocomplete (Mapbox Geocoding)
+  const fetchSuggestions = useCallback((value: string) => {
+    if (suggestionTimer.current) clearTimeout(suggestionTimer.current);
+    if (value.trim().length < 2) { setSuggestions([]); return; }
+    suggestionTimer.current = setTimeout(async () => {
+      try {
+        const token = import.meta.env.VITE_MAPBOX_TOKEN as string;
+        const res = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(value.trim())}.json?access_token=${token}&types=address,place,poi&limit=5&country=ca`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        setSuggestions(data.features ?? []);
+      } catch { /* ignore */ }
+    }, 300);
+  }, []);
+
+  const handleSuggestionSelect = useCallback((s: Suggestion) => {
+    if (geocodeTimer.current) clearTimeout(geocodeTimer.current);
+    if (suggestionTimer.current) clearTimeout(suggestionTimer.current);
+    setSuggestions([]);
+    setDestinationText(s.place_name);
+    setDestination(s.place_name);
+    routeLoaded.current = false;
+    setRouteCoords(null);
+    const mapboxCoords: [number, number] = [s.center[0], s.center[1]];
+    destCoordsRef.current = mapboxCoords;
+    setDestinationCoords(mapboxCoords);
+    setEta(null);
+    if (isActiveRef.current && locRef.current) {
+      routeLoaded.current = true;
+      getWalkingRoute(
+        [locRef.current.lat, locRef.current.lng],
+        [s.center[1], s.center[0]]
+      ).then((r) => { if (r) setRouteCoords(r.waypoints); });
+    }
+  }, [setDestination, setRouteCoords, setDestinationCoords]);
+
   // Check-in hook
   const { checkInSecondsLeft, reset: resetCheckIn } = useCheckIn(
     !!walk.sessionId,
-    () => {
-      setShowCheckIn(true);
-      setEscalationStage(1);
-    }
+    () => { setShowCheckIn(true); setEscalationStage(1); }
   );
 
   const handleSafe = () => {
     setShowCheckIn(false);
     setEscalationStage(0);
     resetCheckIn();
-    toast.success("Great, glad you're safe. Check-in reset.");
+    toast.success("Great, glad you're safe.");
   };
 
   // Start walk
   const handleStart = async () => {
     if (!user) return;
     const { data: session, error } = await supabase.from('walk_sessions').insert({
-      user_id: user.id,
-      destination: destinationText || null,
+      user_id: user.id, destination: destinationText || null,
     }).select().single();
     if (error || !session) { toast.error("Couldn't start walk. Try again."); return; }
+    setSuggestions([]);
     startWalk(session.id, session.share_token);
     startTracking();
     stats.refetch();
@@ -282,7 +413,7 @@ export default function Home() {
         distance_meters: Math.round(walk.distanceMeters),
       }).eq('id', walk.sessionId);
     }
-    endWalk(); // clears routeCoords + destinationCoords in store
+    endWalk();
     setEta(null);
     setCurrentLoc(null);
     setDestinationText('');
@@ -292,42 +423,36 @@ export default function Home() {
     const dist = (walk.distanceMeters / 1000).toFixed(1);
     const secs = walk.startedAt ? differenceInSeconds(new Date(), new Date(walk.startedAt)) : 0;
     const dur = formatDuration(intervalToDuration({ start: 0, end: secs * 1000 }), { format: ['hours', 'minutes'] });
-    toast.success(`Walk saved. Walked ${dist} km${dur ? ` in ${dur}` : ''}.`);
+    toast.success(`Walk saved · ${dist} km${dur ? ` · ${dur}` : ''}`);
     stats.refetch();
   };
 
   // SOS
   const handleSOS = async () => {
     if (!user || !walk.sessionId) return;
-    setShowSosOverlay(true);
-    setEscalationStage(2);
     setStatus('sos_triggered');
+    setEscalationStage(2);
 
     await supabase.from('walk_sessions').update({ status: 'sos_triggered' }).eq('id', walk.sessionId);
 
-    // Fetch contacts and send alerts
     const { data: contacts } = await supabase
-      .from('trusted_contacts')
-      .select('full_name, phone')
-      .eq('user_id', user.id);
+      .from('trusted_contacts').select('full_name, phone').eq('user_id', user.id);
 
-    if (contacts?.length) {
-      const shareUrl = walk.shareToken
-        ? `${window.location.origin}/track/${walk.shareToken}`
-        : null;
+    const list = (contacts ?? []).map((c) => ({ name: c.full_name, phone: c.phone }));
+    setSosContacts(list);
+    setShowSosOverlay(true);
+
+    if (list.length) {
+      const shareUrl = walk.shareToken ? `${window.location.origin}/track/${walk.shareToken}` : null;
       const name = profile?.full_name || user.email || 'Someone';
       const message = shareUrl
         ? `EMERGENCY: ${name} has triggered an SOS on SafeWalk. Track their live location: ${shareUrl}`
         : `EMERGENCY: ${name} has triggered an SOS on SafeWalk. Please check on them immediately.`;
-
       await supabase.functions.invoke('send-alert', {
-        body: {
-          contacts: contacts.map((c) => ({ name: c.full_name, phone: c.phone })),
-          message,
-        },
+        body: { contacts: list, message },
       });
     } else {
-      toast.error('No trusted contacts set up. Add contacts so they can be alerted.');
+      toast.error('No trusted contacts — add contacts so they can be alerted.');
     }
   };
 
@@ -340,25 +465,30 @@ export default function Home() {
     if (walk.sessionId) {
       supabase.from('walk_sessions').update({ status: 'active' }).eq('id', walk.sessionId);
     }
-    toast.success("Great, glad you're safe. Check-in reset.");
+    toast.success("Glad you're safe. Emergency cancelled.");
   };
 
   const isActive = !!walk.sessionId;
   const initials = profile?.avatar_initials ?? profile?.full_name?.slice(0, 2).toUpperCase() ?? 'SW';
-  const sheetHeight = isActive ? 280 : 220;
+
+  // Check-in progress bar (90s countdown)
+  const checkInMax = 90;
+  const checkInPct = Math.max(0, Math.min(100, (checkInSecondsLeft / checkInMax) * 100));
+  const checkInMin = Math.floor(checkInSecondsLeft / 60);
+  const checkInSec = checkInSecondsLeft % 60;
 
   return (
     <>
       {/* Overlays */}
       {showCheckIn && !showSosOverlay && (
-        <CheckInOverlay onSafe={handleSafe} escalationStage={walk.escalationStage} />
+        <CheckInOverlay onSafe={handleSafe} secondsLeft={checkInSecondsLeft} />
       )}
       {showSosOverlay && (
-        <SosOverlay onCancel={handleCancelSOS} escalationStage={walk.escalationStage} />
+        <SosOverlay onCancel={handleCancelSOS} contacts={sosContacts} />
       )}
 
       {/* Full-viewport layout */}
-      <div className="relative w-full bg-[#F0F0F4]" style={{ height: 'calc(100vh - 52px)' }}>
+      <div className="relative w-full bg-[#EEF1F6]" style={{ height: 'calc(100vh - 78px)' }}>
 
         {/* Map fills entire background */}
         <div className="absolute inset-0">
@@ -370,110 +500,193 @@ export default function Home() {
           />
         </div>
 
-        {/* Top gradient overlay */}
-        <div className="absolute top-0 left-0 right-0 h-[60px] bg-gradient-to-b from-white/90 to-transparent pointer-events-none z-10" />
-
-        {/* Top bar */}
-        <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-3 z-20 pointer-events-none">
-          <div className="flex items-center gap-1.5 pointer-events-auto">
-            <div className="w-[38px] h-[16px] bg-[#7F77DD] rounded-[8px] flex items-center justify-center">
-              <span className="text-white font-bold text-[9px]">SW</span>
-            </div>
-            <span className="text-[11px] font-bold text-[#1A1A28]">SafeWalk</span>
-          </div>
-          <button
-            className="pointer-events-auto"
-            onClick={() => navigate('/settings')}
-            aria-label="Go to settings"
-          >
-            <Avatar initials={initials} size="sm" />
-          </button>
-        </div>
-
-        {/* Status bar (active walk) */}
+        {/* Active walk: top status banner */}
         {isActive && (
-          <div className="absolute top-0 left-0 right-0 h-[22px] bg-[#3C3489] flex items-center justify-between px-4 z-20">
-            <span className="text-white text-[9px]">Walk active</span>
-            <span className="text-white text-[9px] font-bold">{timer}</span>
+          <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-2.5 bg-white/95 border-b border-[#E0E0E8]">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-[#3B6D11]" aria-hidden="true" />
+              <span className="text-[13px] font-semibold text-[#1A1A28]">Walk in progress</span>
+            </div>
+            <span className="text-[13px] font-bold text-[#1A1A28] tabular-nums">{timer}</span>
+          </div>
+        )}
+
+        {/* Top chrome (idle) */}
+        {!isActive && (
+          <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-3 z-20">
+            <LogoBadge />
+            <button
+              className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-[0_4px_14px_rgba(0,0,0,0.12)]"
+              onClick={() => navigate('/settings')}
+              aria-label="Settings"
+            >
+              <Avatar initials={initials} size={36} />
+            </button>
+          </div>
+        )}
+
+        {/* Floating map buttons (idle) */}
+        {!isActive && (
+          <div className="absolute right-4 bottom-[228px] z-20 flex flex-col gap-2">
+            <button
+              className="w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-[0_4px_14px_rgba(0,0,0,0.12)]"
+              aria-label="Center on my location"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#534AB7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"/><path d="M22 12h-4M6 12H2M12 6V2M12 22v-4"/>
+              </svg>
+            </button>
           </div>
         )}
 
         {/* Bottom sheet */}
         <div
-          className="absolute bottom-0 left-0 right-0 bg-white border-t border-[#E0E0E8] transition-all duration-300 ease-out z-20"
-          style={{ height: sheetHeight, boxShadow: '0 -4px 24px rgba(0,0,0,0.10)' }}
+          className="absolute bottom-0 left-0 right-0 bg-white rounded-t-[24px] z-20 transition-all duration-300"
+          style={{
+            height: isActive ? 290 : 222,
+            boxShadow: '0 -4px 24px rgba(0,0,0,0.08)',
+          }}
         >
-          <div className="pt-3 pb-1 flex justify-center">
-            <div className="sheet-handle" />
+          {/* Handle */}
+          <div className="flex justify-center pt-2 pb-1">
+            <div className="w-11 h-1 bg-[#D5D5DD] rounded-full" />
           </div>
 
           {!isActive ? (
-            /* ── Idle sheet ───────────────────────────────────────────── */
-            <div className="px-4 flex flex-col gap-3">
-              {/* Location row / destination input */}
-              <div className="flex items-center gap-2 h-[28px] bg-white border border-[#E0E0E8] rounded-[8px] px-2">
-                <MapPin size={10} className="text-[#7F77DD] flex-shrink-0" />
-                <input
-                  type="text"
-                  placeholder="Where are you going?"
-                  value={destinationText}
-                  onChange={(e) => handleDestination(e.target.value)}
-                  className="flex-1 text-[11px] text-[#1A1A28] placeholder:text-[#888899] bg-transparent outline-none"
-                />
+            /* ── Idle sheet ───────────────────────────────────── */
+            <div className="px-4 flex flex-col gap-3 pt-1">
+              {/* Search bar + suggestion dropdown */}
+              <div className="relative">
+                <div className="flex items-center gap-2.5 bg-[#F0F0F4] rounded-[14px] px-3.5 py-0" style={{ height: 52 }}>
+                  <SearchIcon />
+                  <input
+                    type="text"
+                    placeholder="Where are you going?"
+                    value={destinationText}
+                    onChange={(e) => { handleDestination(e.target.value); fetchSuggestions(e.target.value); }}
+                    onBlur={() => setTimeout(() => setSuggestions([]), 150)}
+                    className="flex-1 text-[15px] text-[#1A1A28] placeholder:text-[#888899] bg-transparent outline-none font-[Inter,sans-serif]"
+                  />
+                  {destinationText.length > 0 && (
+                    <button
+                      onClick={() => { handleDestination(''); setSuggestions([]); }}
+                      className="flex-shrink-0 text-[#888899] hover:text-[#1A1A28]"
+                      aria-label="Clear destination"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                        <path d="M18 6 6 18M6 6l12 12"/>
+                      </svg>
+                    </button>
+                  )}
+                </div>
+
+                {suggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 bottom-full mb-2 bg-white rounded-[14px] border border-[#E0E0E8] overflow-hidden z-10 shadow-[0_-8px_24px_rgba(0,0,0,0.10)]">
+                    {suggestions.map((s, i) => {
+                      const addressPart = s.place_name.startsWith(s.text)
+                        ? s.place_name.slice(s.text.length + 2)
+                        : s.place_name;
+                      return (
+                        <button
+                          key={s.id}
+                          className={`w-full flex items-start gap-3 px-3.5 py-3 text-left transition-colors active:bg-[#F0F0F4] hover:bg-[#F8F8FC] ${i < suggestions.length - 1 ? 'border-b border-[#E0E0E8]' : ''}`}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => handleSuggestionSelect(s)}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888899" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5" aria-hidden="true">
+                            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
+                          </svg>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[14px] font-semibold text-[#1A1A28] truncate">{s.text}</div>
+                            {addressPart && (
+                              <div className="text-[11px] text-[#888899] mt-0.5 truncate">{addressPart}</div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
-              {/* Stats row */}
-              <div className="grid grid-cols-3 gap-2">
+              {/* Stat cards */}
+              <div className="flex gap-2">
                 {[
-                  { label: 'Walks this month', value: stats.data?.walks ?? '—', color: '#7F77DD' },
-                  { label: 'Contacts', value: stats.data?.contacts ?? '—', color: (stats.data?.contacts ?? 1) === 0 ? '#854F0B' : '#7F77DD' },
-                  { label: 'Status', value: 'Safe', color: '#3B6D11' },
-                ].map(({ label, value, color }) => (
-                  <div key={label} className="bg-[#F0F0F4] rounded-[8px] p-2 flex flex-col items-center gap-0.5">
-                    <span className="text-[14px] font-bold" style={{ color }}>{value}</span>
-                    <span className="text-[7px] text-[#888899] text-center">{label}</span>
+                  { label: 'Walks this month', value: stats.data?.walks ?? '—' },
+                  { label: 'Contacts ready', value: stats.data?.contacts ?? '—' },
+                  { label: 'Status', value: 'Safe', valueColor: '#3B6D11' },
+                ].map(({ label, value, valueColor }) => (
+                  <div key={label} className="flex-1 bg-[#F0F0F4] rounded-[14px] p-3 flex flex-col gap-0.5">
+                    <span className="text-[11px] text-[#888899] font-medium">{label}</span>
+                    <span
+                      className="text-[18px] font-bold text-[#1A1A28] tracking-[-0.3px]"
+                      style={valueColor ? { color: valueColor } : undefined}
+                    >
+                      {value}
+                    </span>
                   </div>
                 ))}
               </div>
 
-              <Button fullWidth size="lg" onClick={handleStart}>Start Walk</Button>
+              {/* Start walk CTA */}
+              <button
+                onClick={handleStart}
+                className="w-full h-[52px] rounded-[14px] bg-[#7F77DD] text-white font-semibold text-[16px] transition-colors hover:bg-[#6B62D4] active:scale-[0.98]"
+                style={{ boxShadow: '0 6px 18px rgba(127,119,221,0.35), inset 0 1px 0 rgba(255,255,255,0.18)' }}
+              >
+                Start walk
+              </button>
             </div>
           ) : (
-            /* ── Active walk sheet ────────────────────────────────────── */
-            <div className="flex flex-col gap-0">
-              <CheckInBar secondsLeft={checkInSecondsLeft} />
-
-              <div className="px-4 py-2 flex items-start justify-between">
-                {/* Walk timer + distance */}
-                <div>
-                  <p className="text-[18px] font-bold text-[#1A1A28] tabular-nums">{timer}</p>
-                  <p className="text-[8px] text-[#888899]">
-                    {(walk.distanceMeters / 1000).toFixed(2)} km walked
-                  </p>
+            /* ── Active walk sheet ────────────────────────────── */
+            <div className="flex flex-col gap-3 px-4 pt-1.5">
+              {/* Check-in countdown card */}
+              <div className="bg-[#EEEDFE] rounded-[14px] px-4 py-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[13px] font-semibold text-[#534AB7]">Next check-in in</span>
+                  <span
+                    className="text-[15px] font-bold text-[#534AB7] tabular-nums"
+                    aria-live="polite"
+                    aria-label={`${checkInMin} minutes ${checkInSec} seconds`}
+                  >
+                    {checkInMin}:{String(checkInSec).padStart(2, '0')}
+                  </span>
                 </div>
-                {/* Destination + status */}
-                <div className="text-right">
-                  <p className="text-[10px] font-bold text-[#1A1A28] truncate max-w-[120px]">
-                    {walk.destination ?? 'No destination'}
-                  </p>
-                  {eta && <p className="text-[8px] text-[#888899]">{eta}</p>}
-                  <Badge variant="success" className="mt-1">All good</Badge>
+                <div className="h-1.5 bg-[#DCD9FB] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#7F77DD] rounded-full transition-all duration-1000"
+                    style={{ width: `${checkInPct}%` }}
+                  />
                 </div>
               </div>
 
-              <div className="px-4 flex items-end gap-4 pb-2">
+              {/* Stat cards */}
+              <div className="flex gap-2">
+                {[
+                  { label: 'Time', value: timer },
+                  { label: 'Distance', value: `${(walk.distanceMeters / 1000).toFixed(2)} km` },
+                  { label: 'ETA', value: eta ?? '—' },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex-1 bg-[#F0F0F4] rounded-[14px] p-2.5 flex flex-col gap-0.5">
+                    <span className="text-[11px] text-[#888899] font-medium">{label}</span>
+                    <span className="text-[14px] font-bold text-[#1A1A28] tabular-nums tracking-[-0.2px]">{value}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* SOS + End walk */}
+              <div className="flex items-center gap-4">
                 <SosButton onActivated={handleSOS} />
                 <div className="flex-1 flex flex-col gap-1.5">
-                  <p className="text-[8px] text-[#888899] leading-relaxed">
-                    Press and hold 3 seconds to activate emergency
+                  <p className="text-[11px] text-[#888899] leading-relaxed">
+                    Press &amp; hold 3 s to alert contacts
                   </p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                  <button
                     onClick={() => setShowEndConfirm(true)}
+                    className="h-[44px] rounded-[14px] bg-[#EEEDFE] text-[#534AB7] border border-[#DCD9FB] font-semibold text-[14px] w-full"
                   >
                     End walk
-                  </Button>
+                  </button>
                 </div>
               </div>
             </div>

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { CheckCircle2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/Button';
+import { AuthPage } from '../../components/layout/AuthPage';
 
 export default function CheckEmail() {
   const location = useLocation();
@@ -22,24 +22,29 @@ export default function CheckEmail() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      <div className="h-[22px] bg-[#7F77DD]" />
-      <div className="flex-1 flex flex-col items-center justify-center px-8 py-10 gap-6">
-        <div className="w-[72px] h-[72px] rounded-full bg-[#EAF3DE] flex items-center justify-center">
-          <CheckCircle2 size={32} className="text-[#3B6D11]" />
-        </div>
-        <div className="text-center flex flex-col gap-2">
-          <p className="text-[14px] font-bold text-[#1A1A28]">Check your email</p>
-          <p className="text-[11px] text-[#888899] leading-relaxed">
-            We sent a confirmation link to<br />
-            <strong className="text-[#1A1A28]">{email}</strong><br />
-            Click it to activate your account.
-          </p>
+    <AuthPage title="Check your email">
+      <div className="flex flex-col flex-1 items-center justify-center text-center gap-6 py-8">
+        {/* Green circle with mail icon */}
+        <div
+          className="w-[88px] h-[88px] rounded-full flex items-center justify-center"
+          style={{ background: '#EAF3DE' }}
+          aria-hidden="true"
+        >
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3B6D11" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/>
+          </svg>
         </div>
 
-        <div className="w-full max-w-[264px] flex flex-col gap-3">
+        <div className="flex flex-col gap-1.5">
+          <div className="text-[26px] font-bold text-[#1A1A28] tracking-[-0.5px]">Check your email</div>
+          <div className="text-[14px] text-[#4A4A5A] leading-relaxed">We sent a confirmation link to</div>
+          <div className="text-[15px] font-bold text-[#1A1A28]">{email || 'your inbox'}</div>
+          <div className="text-[14px] text-[#4A4A5A]">Click it to activate your account.</div>
+        </div>
+
+        <div className="flex flex-col gap-2.5 w-full">
           {email && (
-            <a href={`mailto:${email}`} className="block">
+            <a href={`mailto:${email}`} className="block w-full">
               <Button fullWidth>Open email app</Button>
             </a>
           )}
@@ -48,13 +53,19 @@ export default function CheckEmail() {
             fullWidth
             onClick={resend}
             disabled={cooldown > 0}
+            aria-live="polite"
           >
             {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend email'}
           </Button>
         </div>
 
-        <Link to="/sign-in" className="text-[9px] text-[#7F77DD]">← Back to sign in</Link>
+        <Link
+          to="/sign-in"
+          className="text-[13px] font-semibold text-[#534AB7] no-underline mt-2"
+        >
+          ← Back to sign in
+        </Link>
       </div>
-    </div>
+    </AuthPage>
   );
 }

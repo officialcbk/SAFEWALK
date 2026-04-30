@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const HOLD_MS = 3000;
-const CIRCUMFERENCE = 163; // 2π × ~26
+const CIRCUMFERENCE = 201; // 2π × 32
 
 interface SosButtonProps {
   onActivated: () => void;
@@ -57,17 +57,41 @@ export function SosButton({ onActivated, disabled }: SosButtonProps) {
     return () => btn.removeEventListener('touchstart', onTouch);
   }, [start]);
 
+  // Keyboard: hold Space/Enter to activate (same 3s hold behaviour)
+  useEffect(() => {
+    const btn = btnRef.current;
+    if (!btn) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.code === 'Space' || e.code === 'Enter') && !e.repeat) {
+        e.preventDefault();
+        start();
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space' || e.code === 'Enter') {
+        e.preventDefault();
+        cancel();
+      }
+    };
+    btn.addEventListener('keydown', onKeyDown);
+    btn.addEventListener('keyup', onKeyUp);
+    return () => {
+      btn.removeEventListener('keydown', onKeyDown);
+      btn.removeEventListener('keyup', onKeyUp);
+    };
+  }, [start, cancel]);
+
   useEffect(() => () => cancel(), [cancel]);
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <div className="relative flex items-center justify-center" style={{ width: 70, height: 70 }}>
+    <div className="flex flex-col items-center gap-1.5">
+      <div className="relative flex items-center justify-center" style={{ width: 84, height: 84 }}>
         {/* Progress ring */}
-        <svg className="absolute" width="70" height="70" style={{ transform: 'rotate(-90deg)' }}>
-          <circle cx="35" cy="35" r="26" fill="none" stroke="#FCEBEB" strokeWidth="3" />
+        <svg className="absolute" width="84" height="84" style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx="42" cy="42" r="32" fill="none" stroke="rgba(226,75,74,0.2)" strokeWidth="3.5" />
           <circle
-            cx="35" cy="35" r="26"
-            fill="none" stroke="#E24B4A" strokeWidth="3"
+            cx="42" cy="42" r="32"
+            fill="none" stroke="#E24B4A" strokeWidth="3.5"
             strokeDasharray={CIRCUMFERENCE}
             strokeDashoffset={progress}
             strokeLinecap="round"
@@ -82,19 +106,16 @@ export function SosButton({ onActivated, disabled }: SosButtonProps) {
           disabled={disabled}
           aria-label="Emergency SOS — press and hold to activate"
           aria-pressed={holding}
-          className="w-16 h-16 rounded-full bg-[#E24B4A] text-white font-bold text-[10px] flex items-center justify-center relative z-10 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-[72px] h-[72px] rounded-full bg-[#E24B4A] text-white font-bold text-[14px] tracking-[1px] flex items-center justify-center relative z-10 border-[3px] border-white disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-[0.96]"
           style={{
             boxShadow: holding
-              ? '0 0 0 3px #E24B4A, 0 4px 24px rgba(226,75,74,0.5)'
-              : '0 0 0 3px #E24B4A, 0 4px 16px rgba(226,75,74,0.4)',
+              ? '0 0 0 3px #E24B4A, 0 8px 28px rgba(226,75,74,0.55)'
+              : '0 0 0 3px #E24B4A, 0 8px 22px rgba(226,75,74,0.45)',
           }}
         >
           {holding ? countdown : 'SOS'}
         </button>
       </div>
-      <p className="text-[8px] text-[#888899] text-center">
-        {holding ? 'Release to cancel' : 'Hold 3s to activate'}
-      </p>
     </div>
   );
 }

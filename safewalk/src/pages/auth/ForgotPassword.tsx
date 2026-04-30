@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { supabase } from '../../lib/supabase';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { AuthPage } from '../../components/layout/AuthPage';
 
 const schema = z.object({ email: z.string().email('Enter a valid email') });
 type FormData = z.infer<typeof schema>;
@@ -21,41 +22,64 @@ export default function ForgotPassword() {
     await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
-    setSent(true); // show success regardless of whether email exists
+    setSent(true);
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      <div className="h-[22px] bg-[#7F77DD]" />
-      <div className="flex-1 flex flex-col items-center justify-center px-8 py-10 gap-6">
-        <div className="flex flex-col items-center gap-1.5">
-          <div className="w-[100px] h-[40px] bg-[#7F77DD] rounded-[10px] flex items-center justify-center">
-            <span className="text-white font-bold text-[16px]">SW</span>
+    <AuthPage title="Reset your SafeWalk password">
+      <div className="flex flex-col flex-1">
+        <div className="mt-7 flex flex-col items-center gap-3 mb-8">
+          <div
+            className="w-10 h-10 rounded-[12px] flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, #7F77DD, #534AB7)', boxShadow: '0 6px 20px rgba(127,119,221,0.4)' }}
+            aria-hidden="true"
+          >
+            <svg viewBox="0 0 64 64" width={32} height={32}>
+              <circle cx="32" cy="32" r="24" fill="none" stroke="rgba(255,255,255,0.32)" strokeWidth="2.2"/>
+              <circle cx="32" cy="32" r="15" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2.2"/>
+              <circle cx="32" cy="32" r="6" fill="white"/>
+            </svg>
           </div>
-          <p className="text-[14px] font-bold text-[#1A1A28]">Reset password</p>
+          <div className="text-[22px] font-bold text-[#1A1A28] tracking-[-0.4px]">Reset password</div>
         </div>
 
         {sent ? (
-          <div className="w-full max-w-[264px] text-center flex flex-col gap-3">
-            <div className="w-14 h-14 rounded-full bg-[#EAF3DE] flex items-center justify-center mx-auto">
-              <span className="text-2xl">✉️</span>
+          <div className="flex flex-col items-center gap-4 text-center" role="status" aria-live="polite">
+            <div className="w-[72px] h-[72px] rounded-full bg-[#EAF3DE] flex items-center justify-center" aria-hidden="true">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3B6D11" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/>
+              </svg>
             </div>
-            <p className="text-[11px] text-[#888899] leading-relaxed">
-              If an account exists for that email, a reset link has been sent.
+            <p className="text-[14px] text-[#4A4A5A] leading-relaxed">
+              If an account exists for that email, a reset link has been sent. Check your inbox.
             </p>
-            <Link to="/sign-in" className="text-[9px] text-[#7F77DD]">← Back to sign in</Link>
+            <Link to="/sign-in" className="text-[13px] font-semibold text-[#534AB7] no-underline">
+              ← Back to sign in
+            </Link>
           </div>
         ) : (
-          <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-[264px] flex flex-col gap-4">
-            <p className="text-[11px] text-[#888899] leading-relaxed">
+          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3.5" noValidate>
+            <p className="text-[14px] text-[#888899] leading-relaxed mb-1">
               Enter your email and we'll send you a reset link.
             </p>
-            <Input label="Email" type="email" placeholder="you@email.com" error={errors.email?.message} {...register('email')} />
+            <Input
+              label="Email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@email.com"
+              error={errors.email?.message}
+              {...register('email')}
+            />
             <Button type="submit" fullWidth loading={isSubmitting}>Send reset link</Button>
-            <Link to="/sign-in" className="text-[9px] text-[#7F77DD] text-center block">← Back to sign in</Link>
+            <Link
+              to="/sign-in"
+              className="text-[13px] font-semibold text-[#534AB7] text-center no-underline mt-1"
+            >
+              ← Back to sign in
+            </Link>
           </form>
         )}
       </div>
-    </div>
+    </AuthPage>
   );
 }

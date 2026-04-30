@@ -13,23 +13,15 @@ interface ConfirmDialogProps {
 }
 
 export function ConfirmDialog({
-  isOpen,
-  onClose,
-  onConfirm,
-  title,
-  body,
-  confirmLabel = 'Confirm',
-  confirmVariant = 'primary',
-  loading,
+  isOpen, onClose, onConfirm, title, body,
+  confirmLabel = 'Confirm', confirmVariant = 'primary', loading,
 }: ConfirmDialogProps) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
-      <p className="text-[11px] text-[#888899] leading-relaxed mb-5">{body}</p>
-      <div className="flex gap-3">
-        <Button variant="ghost" size="md" fullWidth onClick={onClose} disabled={loading}>
-          Cancel
-        </Button>
-        <Button variant={confirmVariant} size="md" fullWidth onClick={onConfirm} loading={loading}>
+      <p className="text-[13px] text-[#888899] leading-relaxed mb-5">{body}</p>
+      <div className="flex gap-2.5">
+        <Button variant="ghost" fullWidth onClick={onClose} disabled={loading}>Cancel</Button>
+        <Button variant={confirmVariant} fullWidth onClick={onConfirm} loading={loading}>
           {confirmLabel}
         </Button>
       </div>

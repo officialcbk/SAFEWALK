@@ -1,13 +1,10 @@
-import { useState } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { format, isToday, isYesterday } from 'date-fns';
-import { Clock, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import type { WalkSession } from '../types';
 import { Badge } from '../components/ui/Badge';
-import { EmptyState } from '../components/ui/EmptyState';
 
 const PAGE_SIZE = 20;
 
@@ -22,19 +19,26 @@ function formatDur(secs: number | null) {
   if (!secs) return '—';
   const m = Math.floor(secs / 60);
   if (m < 60) return `${m} min`;
-  return `${Math.floor(m/60)}h ${m%60}m`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
 function statusBadge(status: WalkSession['status']) {
-  if (status === 'completed')    return <Badge variant="success">Completed</Badge>;
+  if (status === 'completed')     return <Badge variant="success">Completed</Badge>;
   if (status === 'sos_triggered') return <Badge variant="danger">SOS used</Badge>;
-  return <Badge variant="warning">Ended early</Badge>;
+  return <Badge variant="amber">Ended early</Badge>;
+}
+
+function WalkIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#534AB7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="13" cy="4" r="2"/><path d="m13 7-2 4 3 3v6"/><path d="m11 11-3 1-2 4"/><path d="M14 14h4"/>
+    </svg>
+  );
 }
 
 export default function History() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
-  const [expanded, setExpanded] = useState<string | null>(null);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
     queryKey: ['history', user?.id],
@@ -50,80 +54,75 @@ export default function History() {
         .range(from, from + PAGE_SIZE - 1);
       return { items: (data ?? []) as WalkSession[], nextOffset: from + PAGE_SIZE };
     },
-    getNextPageParam: (last, all) => {
-      return last.items.length < PAGE_SIZE ? undefined : last.nextOffset;
-    },
+    getNextPageParam: (last) => last.items.length < PAGE_SIZE ? undefined : last.nextOffset,
   });
 
   const all = data?.pages.flatMap((p) => p.items) ?? [];
+  const totalDist = all.reduce((sum, w) => sum + (w.distance_meters ?? 0), 0);
 
   return (
-    <div className="px-4 pt-5 pb-4">
-      <h1 className="text-[13px] font-bold text-[#1A1A28] mb-4">Walk history</h1>
+    <div className="min-h-full bg-[#F0F0F4]">
+      {/* Header */}
+      <div className="px-5 pt-3 pb-3">
+        <h1 className="text-[26px] font-bold text-[#1A1A28] tracking-[-0.5px]">History</h1>
+        {all.length > 0 && (
+          <p className="text-[13px] text-[#888899] mt-0.5">
+            {all.length} walk{all.length !== 1 ? 's' : ''} · {(totalDist / 1000).toFixed(1)} km total
+          </p>
+        )}
+      </div>
 
-      {isLoading ? (
-        <div className="flex flex-col gap-2">
-          {[1,2,3].map((i) => <div key={i} className="h-[52px] bg-[#F0F0F4] rounded-[10px] animate-shimmer" />)}
-        </div>
-      ) : all.length === 0 ? (
-        <EmptyState
-          icon={Clock}
-          title="No walks yet"
-          body="Start your first walk to see your history here."
-          actionLabel="Start your first walk"
-          onAction={() => navigate('/home')}
-        />
-      ) : (
-        <div className="flex flex-col gap-2">
-          {all.map((w) => (
+      <div className="px-4 pb-6">
+        {isLoading ? (
+          <div className="flex flex-col gap-2">
+            {[1, 2, 3].map((i) => <div key={i} className="h-[72px] bg-white rounded-[14px] animate-shimmer" />)}
+          </div>
+        ) : all.length === 0 ? (
+          <div className="bg-white rounded-[14px] p-8 text-center border border-[#E0E0E8]">
+            <p className="text-[15px] font-semibold text-[#1A1A28] mb-1">No walks yet</p>
+            <p className="text-[13px] text-[#888899]">Start your first walk to see your history here.</p>
             <button
-              key={w.id}
-              onClick={() => setExpanded((e) => e === w.id ? null : w.id)}
-              className="flex flex-col bg-white border border-[#E0E0E8] rounded-[10px] p-3 text-left w-full transition-all"
+              onClick={() => navigate('/home')}
+              className="mt-4 text-[13px] font-semibold text-[#534AB7]"
             >
-              <div className="flex items-center gap-3 min-h-[52px]">
-                <div className="w-7 h-7 rounded-full bg-[#EEEDFE] flex items-center justify-center flex-shrink-0">
-                  <MapPin size={12} className="text-[#7F77DD]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-bold text-[#1A1A28] truncate">
-                    {w.destination ?? 'Walk'}
-                  </p>
-                  <p className="text-[8px] text-[#888899]">{formatDate(w.started_at)}</p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-[9px] font-bold text-[#1A1A28]">{formatDur(w.duration_seconds)}</p>
-                  <div className="mt-1">{statusBadge(w.status)}</div>
+              Start your first walk
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {all.map((w) => (
+              <div key={w.id} className="bg-white border border-[#E0E0E8] rounded-[14px] p-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-[12px] bg-[#EEEDFE] flex items-center justify-center flex-shrink-0">
+                    <WalkIcon />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[15px] font-semibold text-[#1A1A28] truncate">
+                      {w.destination ?? 'Walk'}
+                    </div>
+                    <div className="text-[12px] text-[#888899] mt-0.5">
+                      {formatDate(w.started_at)}
+                      {w.duration_seconds ? ` · ${formatDur(w.duration_seconds)}` : ''}
+                      {w.distance_meters ? ` · ${(w.distance_meters / 1000).toFixed(1)} km` : ''}
+                    </div>
+                  </div>
+                  {statusBadge(w.status)}
                 </div>
               </div>
+            ))}
 
-              {/* Expanded detail */}
-              {expanded === w.id && (
-                <div className="border-t border-[#F0F0F4] mt-2 pt-2 flex flex-col gap-1.5">
-                  {w.distance_meters && (
-                    <p className="text-[9px] text-[#888899]">
-                      Distance: <strong className="text-[#1A1A28]">{(w.distance_meters / 1000).toFixed(2)} km</strong>
-                    </p>
-                  )}
-                  <p className="text-[9px] text-[#888899]">
-                    Started: <strong className="text-[#1A1A28]">{formatDate(w.started_at)}</strong>
-                  </p>
-                </div>
-              )}
-            </button>
-          ))}
-
-          {hasNextPage && (
-            <button
-              onClick={() => fetchNextPage()}
-              disabled={isFetchingNextPage}
-              className="text-[9px] text-[#7F77DD] text-center py-3"
-            >
-              {isFetchingNextPage ? 'Loading…' : 'Load more walks ↓'}
-            </button>
-          )}
-        </div>
-      )}
+            {hasNextPage && (
+              <button
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="w-full h-[52px] bg-[#EEEDFE] text-[#534AB7] rounded-[14px] text-[14px] font-semibold border border-[#DCD9FB] mt-1"
+              >
+                {isFetchingNextPage ? 'Loading…' : 'Load more'}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

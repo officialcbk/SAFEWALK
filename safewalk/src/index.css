@@ -39,13 +39,56 @@
 /* ── Base reset ─────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html {
+  scroll-behavior: smooth;
+  /* Prevent layout shift when scrollbar appears */
+  scrollbar-gutter: stable;
+}
+
 html, body, #root {
   height: 100%;
   font-family: var(--font-family-sans);
   color: var(--color-dark-text);
   background-color: var(--color-gray-bg);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
+
+/* Desktop: gradient behind the phone shell */
+@media (min-width: 431px) {
+  body {
+    background: linear-gradient(145deg, #EEEDFE 0%, #E8E8F4 40%, #F0F0F4 100%);
+  }
+}
+
+/* ── Global focus ring (keyboard navigation) ─────────────────── */
+:focus-visible {
+  outline: 2px solid #7F77DD;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Remove focus ring for mouse users — keep for keyboard */
+:focus:not(:focus-visible) { outline: none; }
+
+/* ── Skip-to-main link (screen readers / keyboard) ──────────── */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #7F77DD;
+  color: white;
+  padding: 8px 20px;
+  border-radius: 0 0 10px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 9999;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.skip-link:focus { top: 0; outline: none; }
 
 /* ── Mapbox GL overrides ─────────────────────────────────────── */
 .mapboxgl-map { font-family: var(--font-family-sans) !important; }

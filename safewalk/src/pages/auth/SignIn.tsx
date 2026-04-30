@@ -3,16 +3,35 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Lock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { AuthPage } from '../../components/layout/AuthPage';
 
 const schema = z.object({
   email:    z.string().email('Enter a valid email'),
   password: z.string().min(1, 'Password is required'),
 });
 type FormData = z.infer<typeof schema>;
+
+function LogoMark() {
+  return (
+    <div className="inline-flex items-center gap-2 bg-white rounded-full px-3.5 py-2 shadow-[0_2px_10px_rgba(0,0,0,0.08)]">
+      <div
+        className="w-7 h-7 rounded-[8px] flex items-center justify-center"
+        style={{ background: 'linear-gradient(135deg, #7F77DD, #534AB7)' }}
+        aria-hidden="true"
+      >
+        <svg viewBox="0 0 64 64" width={22} height={22}>
+          <circle cx="32" cy="32" r="24" fill="none" stroke="rgba(255,255,255,0.32)" strokeWidth="2.2"/>
+          <circle cx="32" cy="32" r="15" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2.2"/>
+          <circle cx="32" cy="32" r="6" fill="white"/>
+        </svg>
+      </div>
+      <span className="font-bold text-[14px] text-[#1A1A28] tracking-[-0.2px]">SafeWalk</span>
+    </div>
+  );
+}
 
 export default function SignIn() {
   const navigate = useNavigate();
@@ -38,7 +57,6 @@ export default function SignIn() {
       return;
     }
     if (data.session) {
-      // Check if onboarding done
       const { data: profile } = await supabase
         .from('profiles')
         .select('onboarding_completed')
@@ -53,45 +71,69 @@ export default function SignIn() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* Purple status bar */}
-      <div className="h-[22px] bg-[#7F77DD]" />
-
-      <div className="flex-1 flex flex-col items-center justify-center px-8 py-10 gap-6">
-        {/* Logo block */}
-        <div className="flex flex-col items-center gap-2">
-          <div className="w-[100px] h-[50px] bg-[#7F77DD] rounded-[10px] flex items-center justify-center">
-            <span className="text-white font-bold text-[22px]">SW</span>
+    <AuthPage title="Sign in to SafeWalk">
+      <div className="flex flex-col flex-1">
+        {/* Header */}
+        <div className="mt-7 flex flex-col items-center gap-3.5 mb-9">
+          <LogoMark />
+          <div className="text-center">
+            <div className="text-[24px] font-bold text-[#1A1A28] tracking-[-0.4px]">Welcome back</div>
+            <div className="text-[14px] text-[#888899] mt-1">Your safety, always on</div>
           </div>
-          <p className="text-[16px] font-bold text-[#1A1A28]">SafeWalk</p>
-          <p className="text-[9px] text-[#888899]">Your safety, always on</p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-[264px] flex flex-col gap-4">
-          <Input label="Email" type="email" placeholder="you@email.com" error={errors.email?.message} {...register('email')} />
-          <Input label="Password" type="password" placeholder="••••••••" error={errors.password?.message || serverError} {...register('password')} />
+        {/* Form */}
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3.5" noValidate>
+          <Input
+            label="Email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@email.com"
+            error={errors.email?.message}
+            {...register('email')}
+          />
+          <Input
+            label="Password"
+            type="password"
+            autoComplete="current-password"
+            placeholder="••••••••"
+            error={errors.password?.message || serverError}
+            {...register('password')}
+          />
 
-          <Button type="submit" fullWidth loading={isSubmitting}>Sign in</Button>
-
-          <Link to="/forgot-password" className="text-[9px] text-[#7F77DD] text-center block">
-            Forgot password?
-          </Link>
+          <Button type="submit" fullWidth loading={isSubmitting} className="mt-1.5">
+            Sign in
+          </Button>
         </form>
 
-        <div className="w-full max-w-[264px]">
-          <div className="border-t border-[#E0E0E8] my-4" />
-          <p className="text-center text-[9px]">
-            <span className="text-[#888899]">New here? </span>
-            <Link to="/sign-up" className="text-[#7F77DD] font-medium">Create account →</Link>
-          </p>
+        <div className="text-center mt-3.5">
+          <Link
+            to="/forgot-password"
+            className="text-[13px] font-semibold text-[#534AB7] no-underline"
+          >
+            Forgot password?
+          </Link>
         </div>
 
+        <div className="flex-1" />
+
         {/* Security note */}
-        <div className="w-full max-w-[264px] bg-[#EEEDFE] rounded-lg px-3 py-2 flex items-center gap-2">
-          <Lock size={12} className="text-[#534AB7] flex-shrink-0" />
-          <p className="text-[8px] text-[#534AB7]">End-to-end encrypted · PIPEDA compliant</p>
+        <div className="bg-[#EEEDFE] rounded-[12px] px-3.5 py-3 flex items-center gap-2.5 mt-6">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#534AB7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+          </svg>
+          <span className="text-[12px] font-medium text-[#3C3489]">
+            End-to-end encrypted · PIPEDA compliant
+          </span>
+        </div>
+
+        <div className="text-center mt-4 text-[13px] text-[#888899]">
+          New here?{' '}
+          <Link to="/sign-up" className="text-[#534AB7] font-semibold no-underline">
+            Create account →
+          </Link>
         </div>
       </div>
-    </div>
+    </AuthPage>
   );
 }

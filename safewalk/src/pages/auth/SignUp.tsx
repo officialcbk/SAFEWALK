@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { supabase } from '../../lib/supabase';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { AuthPage } from '../../components/layout/AuthPage';
 
 const schema = z.object({
   full_name: z.string().min(1, 'Name is required'),
@@ -14,10 +15,10 @@ const schema = z.object({
 });
 type FormData = z.infer<typeof schema>;
 
-function strengthLabel(pw: string) {
-  if (pw.length < 6) return { label: 'Weak', color: '#E24B4A' };
-  if (pw.length < 10) return { label: 'Fair', color: '#854F0B' };
-  return { label: 'Strong', color: '#3B6D11' };
+function strengthInfo(pw: string) {
+  if (pw.length < 6)  return { label: 'Weak',   color: '#E24B4A', w: '30%' };
+  if (pw.length < 10) return { label: 'Fair',   color: '#E8A020', w: '60%' };
+  return                     { label: 'Strong', color: '#3B6D11', w: '100%' };
 }
 
 export default function SignUp() {
@@ -47,55 +48,93 @@ export default function SignUp() {
     navigate('/auth/check-email', { state: { email } });
   };
 
-  const strength = password.length > 0 ? strengthLabel(password) : null;
+  const strength = password.length > 0 ? strengthInfo(password) : null;
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      <div className="h-[22px] bg-[#7F77DD]" />
-
-      <div className="flex-1 flex flex-col items-center justify-center px-8 py-10 gap-6">
-        <div className="flex flex-col items-center gap-1.5">
-          <div className="w-[100px] h-[40px] bg-[#7F77DD] rounded-[10px] flex items-center justify-center">
-            <span className="text-white font-bold text-[16px]">SW</span>
+    <AuthPage title="Create a SafeWalk account">
+      <div className="flex flex-col flex-1">
+        {/* Header */}
+        <div className="mt-4 flex flex-col items-center gap-3 mb-6">
+          <div
+            className="w-10 h-10 rounded-[12px] flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, #7F77DD, #534AB7)', boxShadow: '0 6px 20px rgba(127,119,221,0.4)' }}
+            aria-hidden="true"
+          >
+            <svg viewBox="0 0 64 64" width={32} height={32}>
+              <circle cx="32" cy="32" r="24" fill="none" stroke="rgba(255,255,255,0.32)" strokeWidth="2.2"/>
+              <circle cx="32" cy="32" r="15" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2.2"/>
+              <circle cx="32" cy="32" r="6" fill="white"/>
+            </svg>
           </div>
-          <p className="text-[14px] font-bold text-[#1A1A28]">Create account</p>
-          <p className="text-[9px] text-[#888899]">Safe in 2 minutes</p>
+          <div className="text-center">
+            <div className="text-[22px] font-bold text-[#1A1A28] tracking-[-0.4px]">Create account</div>
+            <div className="text-[13px] text-[#888899] mt-0.5">Safe in 2 minutes</div>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-[264px] flex flex-col gap-4">
-          <Input label="Full name" type="text" autoComplete="name" placeholder="Your full name" error={errors.full_name?.message} {...register('full_name')} />
-          <Input label="Email" type="email" placeholder="you@email.com" error={errors.email?.message} {...register('email')} />
+        {/* Form */}
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3.5" noValidate>
+          <Input
+            label="Full name"
+            type="text"
+            autoComplete="name"
+            placeholder="Alex Johnson"
+            error={errors.full_name?.message}
+            {...register('full_name')}
+          />
+          <Input
+            label="Email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@email.com"
+            error={errors.email?.message}
+            {...register('email')}
+          />
           <div>
             <Input
               label="Password"
               type="password"
+              autoComplete="new-password"
               placeholder="Min. 8 characters"
               error={errors.password?.message || serverError}
               {...register('password', { onChange: (e) => setPassword(e.target.value) })}
             />
             {strength && (
-              <p className="text-[9px] mt-1 font-medium" style={{ color: strength.color }}>
-                {strength.label}
-              </p>
+              <div className="flex items-center gap-2 mt-1.5">
+                <div className="flex-1 h-1 bg-[#F0F0F4] rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-200"
+                    style={{ width: strength.w, background: strength.color }}
+                  />
+                </div>
+                <span className="text-[11px] font-semibold" style={{ color: strength.color }}>
+                  {strength.label}
+                </span>
+              </div>
             )}
           </div>
 
-          <Button type="submit" fullWidth loading={isSubmitting}>Create account</Button>
+          <Button type="submit" fullWidth loading={isSubmitting} className="mt-1">
+            Create account
+          </Button>
         </form>
 
-        <div className="w-full max-w-[264px]">
-          <div className="border-t border-[#E0E0E8] my-4" />
-          <p className="text-[9px] text-center">
-            <span className="text-[#888899]">Already have an account? </span>
-            <Link to="/sign-in" className="text-[#7F77DD] font-medium">Sign in →</Link>
-          </p>
-          <p className="text-[9px] text-center mt-3">
-            <Link to="/terms" className="text-[#7F77DD]">Terms</Link>
-            <span className="text-[#888899] mx-1">·</span>
-            <Link to="/privacy" className="text-[#7F77DD]">Privacy policy</Link>
-          </p>
+        <div className="text-center mt-3 text-[12px] text-[#888899]">
+          By creating an account you agree to our{' '}
+          <a href="#" className="text-[#534AB7] font-semibold no-underline">Terms</a>
+          {' · '}
+          <a href="#" className="text-[#534AB7] font-semibold no-underline">Privacy</a>
+        </div>
+
+        <div className="flex-1" />
+
+        <div className="text-center text-[13px] text-[#888899] mt-4">
+          Already have an account?{' '}
+          <Link to="/sign-in" className="text-[#534AB7] font-semibold no-underline">
+            Sign in →
+          </Link>
         </div>
       </div>
-    </div>
+    </AuthPage>
   );
 }
