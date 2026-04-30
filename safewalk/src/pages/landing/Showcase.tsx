@@ -12,21 +12,17 @@ const screens = [
 export function Showcase() {
   return (
     <section style={{ padding: '96px 0 80px', background: 'linear-gradient(180deg, white 0%, #EEEDFE 100%)', overflow: 'hidden' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 28px' }}>
+      <div className="l-inner" style={{ padding: '0 28px' }}>
         <div style={{ textAlign: 'center', maxWidth: 640, margin: '0 auto 48px' }}>
           <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1.2, color: '#534AB7', marginBottom: 12 }}>YOUR APP</div>
-          <h2 style={{ fontSize: 44, fontWeight: 800, letterSpacing: -1, margin: 0, lineHeight: 1.1 }}>
-            Calm by design.
-          </h2>
+          <h2 className="l-h2">Calm by design.</h2>
           <p style={{ fontSize: 16, color: '#4A4A5A', lineHeight: 1.55, marginTop: 16 }}>
             No clutter. No anxiety-inducing red. Just the things you need, when you need them.
           </p>
         </div>
       </div>
-      <div style={{
-        display: 'flex', gap: 28, padding: '0 64px 24px', overflowX: 'auto',
-        scrollSnapType: 'x mandatory',
-      }}>
+
+      <div className="l-showcase-scroll">
         {screens.map((s, i) => (
           <div key={i} style={{ scrollSnapAlign: 'center', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
             <MarketingPhone>

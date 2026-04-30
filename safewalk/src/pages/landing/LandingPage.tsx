@@ -1,3 +1,4 @@
+import './landing.css'
 import { LandingNav } from './LandingNav'
 import { Hero } from './Hero'
 import { TrustStrip } from './TrustStrip'

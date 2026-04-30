@@ -3,7 +3,7 @@ import * as Icons from './Icons'
 export function TrustStrip() {
   return (
     <section style={{ background: 'white', borderTop: '1px solid rgba(127,119,221,0.12)', borderBottom: '1px solid rgba(127,119,221,0.12)' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 28px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+      <div className="l-inner" style={{ padding: '20px 28px', display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: 16 }}>
         {[
           { icon: <Icons.Lock size={16} color="#534AB7"/>, label: 'End-to-end encrypted' },
           { icon: <Icons.Shield size={16} color="#534AB7"/>, label: 'PIPEDA compliant' },
