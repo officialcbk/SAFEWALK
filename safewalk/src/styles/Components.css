@@ -1,5 +1,12 @@
-/* Status badge */
+/* ─── Shared component styles ────────────────────────────────────────────────
+   Slice  1 – StatusBadge, MapPlaceholder (original)
+   Slice  6 – sw-button--ghost (used by AlertPreview, EscalationPanel,
+              PermissionModal, ContactsPage, SettingsPage)
+   Slice 10 – sw-button-text (used by WalkPage, ContactsPage, AlertPreview)
+   Slice 15 – centralised here so all variants are available before lazy
+              page chunks load                                              */
 
+/* ── Status badge ─────────────────────────────────────────────────────────── */
 .sw-status-badge {
   display: inline-flex;
   align-items: center;
@@ -38,8 +45,7 @@
   box-shadow: 0 0 10px rgba(34, 197, 94, 0.9);
 }
 
-/* Map card */
-
+/* ── Map placeholder card ─────────────────────────────────────────────────── */
 .sw-map-card {
   margin-top: 0.5rem;
   border-radius: 28px;
@@ -119,8 +125,6 @@
   color: rgba(148, 163, 184, 0.98);
 }
 
-/* Map dots */
-
 .sw-map-dot {
   position: absolute;
   border-radius: 999px;
@@ -142,4 +146,106 @@
   height: 10px;
   border: 2px solid rgba(34, 197, 94, 0.85);
   box-shadow: 0 0 14px rgba(34, 197, 94, 0.9);
+}
+
+/* ── Shared button variants ───────────────────────────────────────────────────
+   Defined here (not in page-level CSS) so they are available globally before
+   lazy-loaded route chunks have rendered.                                   */
+
+/* Ghost – transparent outline button */
+.sw-button--ghost {
+  background: transparent;
+  border: 1px solid rgba(51, 65, 85, 0.65);
+  color: rgba(148, 163, 184, 0.9);
+  padding: 0.75rem 1.25rem;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 120ms, color 120ms;
+  min-height: 48px;
+}
+
+.sw-button--ghost:hover {
+  border-color: rgba(100, 116, 139, 0.8);
+  color: #e2e8f0;
+}
+
+.sw-button--ghost:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.7);
+  outline-offset: 3px;
+}
+
+/* Secondary – muted filled button */
+.sw-button--secondary {
+  background: rgba(51, 65, 85, 0.48);
+  border: 1px solid rgba(71, 85, 105, 0.58);
+  color: #e2e8f0;
+  padding: 0.78rem 1.25rem;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms;
+  min-height: 48px;
+}
+
+.sw-button--secondary:hover {
+  background: rgba(71, 85, 105, 0.6);
+}
+
+.sw-button--secondary:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.7);
+  outline-offset: 3px;
+}
+
+/* Danger – red-tinted destructive action */
+.sw-button--danger {
+  background: rgba(239, 68, 68, 0.09);
+  border: 1px solid rgba(239, 68, 68, 0.38);
+  color: #fca5a5;
+  padding: 0.78rem 1.25rem;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms;
+  min-height: 48px;
+}
+
+.sw-button--danger:hover {
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.sw-button--danger:focus-visible {
+  outline: 2px solid #f87171;
+  outline-offset: 3px;
+}
+
+/* Text – underline-only inline button */
+.sw-button-text {
+  background: none;
+  border: none;
+  padding: 0.2rem 0;
+  font-size: 0.77rem;
+  color: rgba(148, 163, 184, 0.82);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 120ms;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.sw-button-text:hover {
+  color: #e2e8f0;
+}
+
+.sw-button-text--danger {
+  color: rgba(248, 113, 113, 0.78);
+}
+
+.sw-button-text--danger:hover {
+  color: #f87171;
 }

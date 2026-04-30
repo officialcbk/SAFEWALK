@@ -1,0 +1,97 @@
+/* ─── SOS button styles ───────────────────────────────────────────────────────
+   Slice 6 – visible, prominent SOS button
+   Slice 7 – press-and-hold: holding state, countdown overlay          */
+
+/* Wrapper card */
+.sw-sos-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 1.35rem;
+  border-radius: 28px;
+  background: radial-gradient(
+      circle at center,
+      rgba(239, 68, 68, 0.08),
+      transparent 70%
+    ),
+    rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.95);
+}
+
+.sw-sos-wrapper--disabled {
+  opacity: 0.48;
+  border-color: rgba(51, 65, 85, 0.5);
+  background: rgba(15, 23, 42, 0.7);
+}
+
+/* Button */
+.sw-sos-btn {
+  width: 104px;
+  height: 104px;
+  border-radius: 999px;
+  border: 2.5px solid rgba(239, 68, 68, 0.75);
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  /* min 48×48 px touch target satisfied — button is 104×104 */
+  transition: transform 120ms ease-out,
+    background-color 120ms ease-out,
+    box-shadow 120ms ease-out;
+  box-shadow: 0 0 32px rgba(239, 68, 68, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Prevent text selection on long-press mobile */
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.sw-sos-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.18);
+  box-shadow: 0 0 44px rgba(239, 68, 68, 0.52);
+}
+
+.sw-sos-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Focus ring for keyboard users (Slice 16 a11y) */
+.sw-sos-btn:focus-visible {
+  outline: 2px solid #f87171;
+  outline-offset: 4px;
+}
+
+/* Holding / counting-down state */
+.sw-sos-btn--holding {
+  background: rgba(239, 68, 68, 0.28) !important;
+  border-color: #f87171;
+  box-shadow: 0 0 64px rgba(239, 68, 68, 0.72),
+    0 0 0 10px rgba(239, 68, 68, 0.12);
+  transform: scale(0.95);
+  color: #fef2f2;
+  font-size: 2.1rem;
+  animation: sw-sos-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes sw-sos-pulse {
+  0%, 100% { box-shadow: 0 0 64px rgba(239, 68, 68, 0.72), 0 0 0 10px rgba(239, 68, 68, 0.12); }
+  50%       { box-shadow: 0 0 80px rgba(239, 68, 68, 0.9),  0 0 0 18px rgba(239, 68, 68, 0.06); }
+}
+
+.sw-sos-btn--disabled {
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Hint text */
+.sw-sos-hint {
+  font-size: 0.75rem;
+  color: rgba(148, 163, 184, 0.8);
+  text-align: center;
+}
