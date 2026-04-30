@@ -1,0 +1,315 @@
+/* ─── Walk Mode page styles ───────────────────────────────────────────────────
+   Slice 1  – core walk card layout (unchanged from slice 1 baseline)
+   Slice 2  – destination input + ETA display
+   Slice 4  – geolocation error banner
+   Slice 5  – last known location card
+   Slice 15 – loading skeleton for lazy-loaded route chunks              */
+
+/* ── Layout (Slice 1) ─────────────────────────────────────────────────────── */
+.sw-walk-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ── Walk card (Slice 1) ──────────────────────────────────────────────────── */
+.sw-walk-card {
+  border-radius: 28px;
+  padding: 1.4rem 1.35rem 1.25rem;
+  background: radial-gradient(
+      circle at top left,
+      rgba(94, 234, 212, 0.12),
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(59, 130, 246, 0.12),
+      transparent 55%
+    ),
+    rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(51, 65, 85, 0.9);
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.95),
+    0 0 30px rgba(34, 197, 94, 0.25);
+}
+
+.sw-walk-card-header {
+  margin-bottom: 0.9rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.sw-walk-eyebrow {
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.sw-walk-title {
+  margin: 0.35rem 0 0;
+  font-size: 1.4rem;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.sw-walk-description {
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: rgba(148, 163, 184, 0.95);
+  max-width: 18rem;
+}
+
+.sw-walk-meta-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  color: rgba(148, 163, 184, 0.98);
+}
+
+.sw-walk-meta-label {
+  opacity: 0.9;
+}
+
+.sw-walk-meta-value {
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.sw-walk-meta-right {
+  text-align: right;
+}
+
+.sw-walk-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.2rem;
+}
+
+/* ── Buttons (Slice 1 baseline – shared across app) ──────────────────────── */
+.sw-button {
+  border-radius: 999px;
+  border: none;
+  padding: 0.9rem 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out,
+    filter 120ms ease-out, background-color 120ms ease-out;
+  min-height: 48px; /* a11y touch target */
+}
+
+.sw-button--primary {
+  flex: 1;
+  background-image: linear-gradient(135deg, #22c55e, #4ade80);
+  color: #020617;
+  box-shadow: 0 14px 45px rgba(34, 197, 94, 0.4);
+}
+
+.sw-button--primary:hover {
+  filter: brightness(1.05);
+}
+
+.sw-button--primary:active {
+  transform: scale(0.98);
+}
+
+.sw-button--primary:focus-visible {
+  outline: 2px solid #4ade80;
+  outline-offset: 3px;
+}
+
+.sw-button--disabled,
+.sw-button--primary.sw-button--disabled {
+  flex: 1;
+  background-image: none;
+  background-color: rgba(30, 64, 175, 0.5);
+  color: rgba(209, 213, 219, 0.9);
+  cursor: not-allowed;
+  box-shadow: none;
+  filter: none;
+}
+
+.sw-button-icon {
+  width: 3.1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background-color: rgba(15, 23, 42, 0.7);
+  color: rgba(148, 163, 184, 0.9);
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow 120ms ease-out, background-color 120ms ease-out,
+    color 120ms ease-out;
+  min-height: 48px;
+}
+
+.sw-button-icon--stop {
+  background-color: rgba(239, 68, 68, 0.12);
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.6);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.35);
+}
+
+.sw-button-icon--disabled {
+  cursor: not-allowed;
+}
+
+/* ── Destination input + ETA (Slice 2) ────────────────────────────────────── */
+.sw-walk-destination-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.42rem;
+  margin-bottom: 0.6rem;
+}
+
+.sw-walk-destination-input {
+  background: rgba(30, 41, 59, 0.68);
+  border: 1px solid rgba(51, 65, 85, 0.78);
+  border-radius: 12px;
+  padding: 0.62rem 0.9rem;
+  font-size: 0.88rem;
+  color: #f1f5f9;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 120ms, box-shadow 120ms;
+  outline: none;
+  min-height: 48px;
+}
+
+.sw-walk-destination-input:focus {
+  border-color: rgba(34, 197, 94, 0.52);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
+}
+
+.sw-walk-destination-input:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.sw-walk-destination-input::placeholder {
+  color: rgba(100, 116, 139, 0.68);
+}
+
+.sw-walk-eta {
+  font-size: 0.82rem;
+  color: rgba(148, 163, 184, 0.9);
+  margin: 0;
+}
+
+.sw-walk-eta strong {
+  color: #4ade80;
+}
+
+.sw-walk-route-status {
+  font-size: 0.8rem;
+  color: rgba(148, 163, 184, 0.75);
+  margin: 0;
+}
+
+.sw-walk-route-error {
+  font-size: 0.8rem;
+  color: #fca5a5;
+  margin: 0;
+}
+
+/* ── Geolocation error banner (Slice 4) ──────────────────────────────────── */
+.sw-walk-error {
+  font-size: 0.8rem;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.07);
+  border: 1px solid rgba(239, 68, 68, 0.24);
+  border-radius: 10px;
+  padding: 0.52rem 0.8rem;
+  margin-top: 0.3rem;
+  line-height: 1.5;
+}
+
+/* ── Last known location card (Slice 5) ──────────────────────────────────── */
+.sw-last-known-card {
+  border-radius: 20px;
+  padding: 1rem 1.25rem;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(51, 65, 85, 0.58);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.sw-last-known-coords {
+  font-size: 0.88rem;
+  font-family: monospace;
+  color: rgba(148, 163, 184, 0.98);
+  margin: 0.1rem 0;
+}
+
+.sw-last-known-time {
+  font-size: 0.77rem;
+  color: rgba(100, 116, 139, 0.88);
+}
+
+/* ── Leaflet map wrapper (Slice 3) ────────────────────────────────────────── */
+.sw-map-leaflet-wrapper {
+  border-radius: 20px;
+  overflow: hidden;
+  height: 260px;
+  margin-top: 0.6rem;
+  border: 1px solid rgba(51, 65, 85, 0.7);
+}
+
+/* Footnote */
+.sw-walk-footnote {
+  font-size: 0.75rem;
+  color: rgba(148, 163, 184, 0.95);
+  margin-top: 0.35rem;
+  line-height: 1.55;
+}
+
+/* ── Loading skeleton (Slice 15 – performance polish) ────────────────────── */
+.sw-page-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem 0;
+}
+
+.sw-page-skeleton-bar {
+  height: 1.05rem;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.58);
+  width: 100%;
+  animation: sw-shimmer 1.5s ease-in-out infinite;
+}
+
+.sw-page-skeleton-bar--wide  { width: 84%; }
+.sw-page-skeleton-bar--short { width: 52%; }
+
+@keyframes sw-shimmer {
+  0%   { opacity: 0.45; }
+  50%  { opacity: 0.85; }
+  100% { opacity: 0.45; }
+}
+
+/* ── Skip-to-content link (Slice 16 – accessibility) ─────────────────────── */
+.sw-skip-link {
+  position: absolute;
+  top: -999px;
+  left: 1rem;
+  padding: 0.5rem 1rem;
+  background: #22c55e;
+  color: #020617;
+  font-weight: 600;
+  border-radius: 8px;
+  text-decoration: none;
+  z-index: 9999;
+  font-size: 0.88rem;
+}
+
+.sw-skip-link:focus {
+  top: 1rem;
+}

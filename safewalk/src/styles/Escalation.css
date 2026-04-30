@@ -1,0 +1,373 @@
+/* ─── Escalation, alert preview & check-in prompt styles ────────────────────
+   Slice  8 – escalation panel: backdrop, stage pips, countdown
+   Slice  9 – 911 confirmation dialog
+   Slice 11 – alert preview panel
+   Slice 13 – inactivity check-in prompt                               */
+
+/* ── Escalation backdrop & panel ──────────────────────────────────────────── */
+
+.sw-esc-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 1000;
+  padding: 0 0.75rem;
+}
+
+.sw-esc-panel {
+  background: radial-gradient(
+      circle at top,
+      rgba(239, 68, 68, 0.1),
+      transparent 55%
+    ),
+    rgba(15, 23, 42, 0.98);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-bottom: none;
+  border-radius: 28px 28px 0 0;
+  width: 100%;
+  max-width: 480px;
+  padding: 1.5rem 1.4rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Header: trigger label + progress pips */
+.sw-esc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sw-esc-trigger-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(252, 165, 165, 0.88);
+}
+
+.sw-esc-stage-pips {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.sw-esc-pip {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(51, 65, 85, 0.8);
+  border: 1px solid rgba(71, 85, 105, 0.5);
+  transition: background 220ms;
+}
+
+.sw-esc-pip--done {
+  background: rgba(34, 197, 94, 0.55);
+  border-color: rgba(52, 211, 153, 0.5);
+}
+
+.sw-esc-pip--active {
+  background: #ef4444;
+  border-color: rgba(239, 68, 68, 0.8);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.75);
+}
+
+/* Body */
+.sw-esc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.sw-esc-stage-number {
+  font-size: 0.7rem;
+  color: rgba(148, 163, 184, 0.75);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.sw-esc-stage-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #fef2f2;
+  margin: 0;
+}
+
+.sw-esc-stage-desc {
+  font-size: 0.84rem;
+  color: rgba(148, 163, 184, 0.95);
+  line-height: 1.55;
+}
+
+/* Countdown (Slice 8) */
+.sw-esc-countdown {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.sw-esc-countdown-num {
+  font-size: 2.6rem;
+  font-weight: 700;
+  color: #fca5a5;
+  line-height: 1;
+}
+
+.sw-esc-countdown-label {
+  font-size: 0.78rem;
+  color: rgba(148, 163, 184, 0.8);
+}
+
+/* Stage 4: 911 section (Slice 9) */
+.sw-esc-911-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 0.5rem;
+}
+
+.sw-esc-coords {
+  font-size: 0.78rem;
+  color: rgba(148, 163, 184, 0.95);
+  font-family: monospace;
+}
+
+.sw-esc-911-btn {
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  border-radius: 12px;
+  padding: 0.8rem 1.25rem;
+  color: #fca5a5;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms;
+  min-height: 48px; /* a11y touch target */
+}
+
+.sw-esc-911-btn:hover {
+  background: rgba(239, 68, 68, 0.24);
+}
+
+.sw-esc-911-btn:focus-visible {
+  outline: 2px solid #f87171;
+  outline-offset: 3px;
+}
+
+.sw-esc-911-confirmed {
+  font-size: 0.85rem;
+  color: #4ade80;
+}
+
+/* Stage 5: monitoring note */
+.sw-esc-monitoring-note {
+  font-size: 0.85rem;
+  color: rgba(148, 163, 184, 0.9);
+  line-height: 1.55;
+  margin-top: 0.25rem;
+}
+
+/* "I'm Safe" cancel button */
+.sw-esc-safe-btn {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.38);
+  border-radius: 999px;
+  padding: 0.9rem;
+  color: #4ade80;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  transition: background 120ms;
+  min-height: 48px;
+}
+
+.sw-esc-safe-btn:hover {
+  background: rgba(34, 197, 94, 0.18);
+}
+
+.sw-esc-safe-btn:focus-visible {
+  outline: 2px solid #4ade80;
+  outline-offset: 3px;
+}
+
+/* ── 911 confirmation dialog (Slice 9) ──────────────────────────────────────── */
+
+.sw-esc-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 1rem;
+}
+
+.sw-esc-confirm {
+  background: rgba(15, 23, 42, 0.99);
+  border: 1px solid rgba(239, 68, 68, 0.38);
+  border-radius: 24px;
+  padding: 1.75rem;
+  max-width: 340px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sw-esc-confirm-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #fca5a5;
+  margin: 0;
+}
+
+.sw-esc-confirm-body {
+  font-size: 0.84rem;
+  color: rgba(148, 163, 184, 0.95);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.sw-esc-confirm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* ── Alert preview panel (Slice 11) ─────────────────────────────────────────── */
+
+.sw-alert-preview {
+  border-radius: 20px;
+  padding: 1.25rem;
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sw-alert-preview-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #fca5a5;
+  margin: 0;
+}
+
+.sw-alert-preview-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.sw-alert-preview-item {
+  background: rgba(30, 41, 59, 0.55);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  border-radius: 12px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.sw-alert-preview-contact {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sw-alert-preview-name {
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.sw-alert-preview-primary {
+  font-size: 0.64rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.38);
+  color: #4ade80;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.sw-alert-preview-sms-label {
+  font-size: 0.67rem;
+  color: rgba(148, 163, 184, 0.65);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.sw-alert-preview-sms-text {
+  font-size: 0.77rem;
+  color: rgba(148, 163, 184, 0.95);
+  line-height: 1.5;
+  margin: 0.15rem 0 0;
+  font-family: monospace;
+  word-break: break-word;
+}
+
+.sw-alert-preview-empty {
+  font-size: 0.82rem;
+  color: rgba(148, 163, 184, 0.8);
+}
+
+/* ── Check-in prompt (Slice 13) ─────────────────────────────────────────────── */
+
+.sw-checkin-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.88);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 950;
+  padding: 1rem;
+}
+
+.sw-checkin-panel {
+  background: rgba(15, 23, 42, 0.98);
+  border: 1px solid rgba(234, 179, 8, 0.38);
+  border-radius: 28px;
+  padding: 2rem 1.75rem;
+  max-width: 340px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: center;
+  box-shadow: 0 0 40px rgba(234, 179, 8, 0.15);
+}
+
+.sw-checkin-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.sw-checkin-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.sw-checkin-body {
+  font-size: 0.84rem;
+  color: rgba(148, 163, 184, 0.95);
+  line-height: 1.55;
+  margin: 0;
+}

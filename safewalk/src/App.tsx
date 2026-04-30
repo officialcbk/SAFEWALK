@@ -1,35 +1,66 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { lazy, Suspense } from 'react';
+import { Route, Routes, Navigate } from 'react-router-dom';
+import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { AppShell } from './components/layout/AppShell';
+import { FullPageSpinner } from './components/ui/Spinner';
 
-function App() {
-  const [count, setCount] = useState(0)
+// Auth (public)
+const SignIn          = lazy(() => import('./pages/auth/SignIn'));
+const SignUp          = lazy(() => import('./pages/auth/SignUp'));
+const ForgotPassword  = lazy(() => import('./pages/auth/ForgotPassword'));
+const ResetPassword   = lazy(() => import('./pages/auth/ResetPassword'));
+const CheckEmail      = lazy(() => import('./pages/auth/CheckEmail'));
+const AuthCallback    = lazy(() => import('./pages/auth/AuthCallback'));
 
+// Onboarding (protected, first-time only)
+const OnboardingFlow  = lazy(() => import('./pages/onboarding/OnboardingFlow'));
+
+// Main app (protected)
+const Home            = lazy(() => import('./pages/Home'));
+const Contacts        = lazy(() => import('./pages/Contacts'));
+const History         = lazy(() => import('./pages/History'));
+const Settings        = lazy(() => import('./pages/Settings'));
+
+// Public share view
+const ContactWebView  = lazy(() => import('./pages/ContactWebView'));
+
+function Protected({ children }: { children: React.ReactNode }) {
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <ProtectedRoute>
+      <AppShell>{children}</AppShell>
+    </ProtectedRoute>
+  );
 }
 
-export default App
+export default function App() {
+  return (
+    <Suspense fallback={<FullPageSpinner />}>
+      <Routes>
+        {/* Public auth routes */}
+        <Route path="/sign-in"          element={<SignIn />} />
+        <Route path="/sign-up"          element={<SignUp />} />
+        <Route path="/forgot-password"  element={<ForgotPassword />} />
+        <Route path="/reset-password"   element={<ResetPassword />} />
+        <Route path="/auth/check-email" element={<CheckEmail />} />
+        <Route path="/auth/callback"    element={<AuthCallback />} />
+
+        {/* Public trusted contact view */}
+        <Route path="/track/:token"     element={<ContactWebView />} />
+
+        {/* Onboarding (protected) */}
+        <Route path="/onboarding" element={
+          <ProtectedRoute><OnboardingFlow /></ProtectedRoute>
+        } />
+
+        {/* Protected main app */}
+        <Route path="/home"      element={<Protected><Home /></Protected>} />
+        <Route path="/contacts"  element={<Protected><Contacts /></Protected>} />
+        <Route path="/history"   element={<Protected><History /></Protected>} />
+        <Route path="/settings"  element={<Protected><Settings /></Protected>} />
+
+        {/* Default */}
+        <Route path="*" element={<Navigate to="/home" replace />} />
+      </Routes>
+    </Suspense>
+  );
+}
