@@ -29,7 +29,7 @@ export function LandingNav() {
             Sign in
           </button>
           <button
-            onClick={() => navigate('/sign-up')}
+            onClick={() => navigate('/onboarding')}
             style={{ height: 42, padding: '0 18px', fontSize: 14, borderRadius: 999, fontWeight: 700, background: 'linear-gradient(135deg,#7F77DD,#534AB7)', color: 'white', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             Try free

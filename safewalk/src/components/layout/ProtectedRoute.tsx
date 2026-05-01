@@ -27,7 +27,6 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       setSession(newSession);
       setLoading(false);
       if (event === 'SIGNED_IN') {
-        // Only reload profile on actual sign-in, not the INITIAL_SESSION replay
         loadProfile(newSession!.user.id, setProfile);
       } else if (event === 'SIGNED_OUT') {
         setProfile(null);

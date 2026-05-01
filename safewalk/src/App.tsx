@@ -53,10 +53,11 @@ export default function App() {
         {/* Public trusted contact view */}
         <Route path="/track/:token"     element={<ContactWebView />} />
 
-        {/* Onboarding (protected) */}
-        <Route path="/onboarding" element={
-          <ProtectedRoute><OnboardingFlow /></ProtectedRoute>
-        } />
+        {/* Onboarding — public, IS the sign-up flow */}
+        <Route path="/onboarding" element={<OnboardingFlow />} />
+
+        {/* /sign-up redirects into the onboarding flow */}
+        <Route path="/sign-up" element={<Navigate to="/onboarding" replace />} />
 
         {/* Protected main app */}
         <Route path="/home"      element={<Protected><Home /></Protected>} />
