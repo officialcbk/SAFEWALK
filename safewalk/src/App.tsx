@@ -24,6 +24,9 @@ const Settings        = lazy(() => import('./pages/Settings'));
 // Public share view
 const ContactWebView  = lazy(() => import('./pages/ContactWebView'));
 
+// Landing page
+const LandingPage     = lazy(() => import('./pages/landing/LandingPage'));
+
 function Protected({ children }: { children: React.ReactNode }) {
   return (
     <ProtectedRoute>
@@ -36,6 +39,9 @@ export default function App() {
   return (
     <Suspense fallback={<FullPageSpinner />}>
       <Routes>
+        {/* Landing page */}
+        <Route path="/"                 element={<LandingPage />} />
+
         {/* Public auth routes */}
         <Route path="/sign-in"          element={<SignIn />} />
         <Route path="/sign-up"          element={<SignUp />} />
@@ -47,10 +53,11 @@ export default function App() {
         {/* Public trusted contact view */}
         <Route path="/track/:token"     element={<ContactWebView />} />
 
-        {/* Onboarding (protected) */}
-        <Route path="/onboarding" element={
-          <ProtectedRoute><OnboardingFlow /></ProtectedRoute>
-        } />
+        {/* Onboarding — public, IS the sign-up flow */}
+        <Route path="/onboarding" element={<OnboardingFlow />} />
+
+        {/* /sign-up redirects into the onboarding flow */}
+        <Route path="/sign-up" element={<Navigate to="/onboarding" replace />} />
 
         {/* Protected main app */}
         <Route path="/home"      element={<Protected><Home /></Protected>} />
@@ -59,7 +66,7 @@ export default function App() {
         <Route path="/settings"  element={<Protected><Settings /></Protected>} />
 
         {/* Default */}
-        <Route path="*" element={<Navigate to="/home" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
   );

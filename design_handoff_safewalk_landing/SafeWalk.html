@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>SafeWalk — Web MVP</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  html, body, #root { width: 100%; height: 100%; margin: 0; }
+  body { background: #F4F4F8; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="primitives.jsx"></script>
+<script type="text/babel" src="screens-auth.jsx"></script>
+<script type="text/babel" src="screens-walk.jsx"></script>
+<script type="text/babel" src="screens-app.jsx"></script>
+<script type="text/babel" src="interactive.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+const { useState } = React;
+
+// Phone-shaped artboard helper. Wraps a screen in an iOS frame.
+function Phone({ children }) {
+  return (
+    <div style={{
+      width: 390, height: 844,
+      borderRadius: 56,
+      background: '#000',
+      padding: 12,
+      boxShadow: '0 20px 60px rgba(20,20,40,0.18), inset 0 0 0 1px rgba(255,255,255,0.04)',
+      position: 'relative',
+    }}>
+      {/* dynamic island */}
+      <div style={{
+        position: 'absolute', top: 14, left: '50%', transform: 'translateX(-50%)',
+        width: 120, height: 34, background: '#000', borderRadius: 999, zIndex: 30,
+      }}/>
+      <div style={{
+        width: '100%', height: '100%', borderRadius: 44, overflow: 'hidden',
+        background: '#fff', position: 'relative', display: 'flex', flexDirection: 'column',
+      }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <DesignCanvas
+      title="SafeWalk · Web MVP"
+      subtitle="Map-first personal safety app · 15 screens · Original design"
+    >
+      {/* Hero — interactive prototype */}
+      <DCSection id="proto" title="Interactive prototype" subtitle="Walk through the full flow — sign in → start a walk → trigger SOS">
+        <DCArtboard id="full-flow" label="Tap the avatar to navigate · Press &amp; hold SOS for 3s" width={414} height={868}>
+          <Phone><InteractiveProto/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      {/* Auth */}
+      <DCSection id="auth" title="Authentication" subtitle="Sign in, sign up, email confirmation">
+        <DCArtboard id="signin" label="Sign in" width={414} height={868}>
+          <Phone><SignInScreen/></Phone>
+        </DCArtboard>
+        <DCArtboard id="signup" label="Sign up" width={414} height={868}>
+          <Phone><SignUpScreen/></Phone>
+        </DCArtboard>
+        <DCArtboard id="checkemail" label="Check email" width={414} height={868}>
+          <Phone><CheckEmailScreen/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      {/* Onboarding */}
+      <DCSection id="onboarding" title="Onboarding" subtitle="3 steps · shown once after first sign-in">
+        <DCArtboard id="ob1" label="Welcome" width={414} height={868}>
+          <Phone><OnboardingStep1/></Phone>
+        </DCArtboard>
+        <DCArtboard id="ob2" label="Add trusted contact" width={414} height={868}>
+          <Phone><OnboardingStep2/></Phone>
+        </DCArtboard>
+        <DCArtboard id="ob3" label="Location permission" width={414} height={868}>
+          <Phone><OnboardingStep3/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      {/* Home + Walk */}
+      <DCSection id="walk" title="Home · Walk · Safety" subtitle="The map-first home, active walk and the full escalation ladder">
+        <DCArtboard id="home" label="Home — idle" width={414} height={868}>
+          <Phone><HomeIdleScreen/></Phone>
+        </DCArtboard>
+        <DCArtboard id="dest" label="Destination set" width={414} height={868}>
+          <Phone><HomeDestinationScreen/></Phone>
+        </DCArtboard>
+        <DCArtboard id="active" label="Walk in progress" width={414} height={868}>
+          <Phone><ActiveWalkScreen/></Phone>
+        </DCArtboard>
+        <DCArtboard id="checkin" label="Stage 1 — Check-in" width={414} height={868}>
+          <Phone><CheckInOverlay/></Phone>
+        </DCArtboard>
+        <DCArtboard id="sos" label="SOS triggered" width={414} height={868}>
+          <Phone><SOSTriggeredScreen/></Phone>
+        </DCArtboard>
+        <DCArtboard id="escalation" label="Escalation ladder" width={414} height={868}>
+          <Phone><EscalationScreen/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      {/* App pages */}
+      <DCSection id="app" title="Contacts · History · Settings">
+        <DCArtboard id="contacts" label="Trusted contacts" width={414} height={868}>
+          <Phone><ContactsScreen/></Phone>
+        </DCArtboard>
+        <DCArtboard id="addcontact" label="Add contact sheet" width={414} height={868}>
+          <Phone><AddContactScreen/></Phone>
+        </DCArtboard>
+        <DCArtboard id="history" label="Walk history" width={414} height={868}>
+          <Phone><HistoryScreen/></Phone>
+        </DCArtboard>
+        <DCArtboard id="settings" label="Settings" width={414} height={868}>
+          <Phone><SettingsScreen/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      {/* Public link */}
+      <DCSection id="public" title="Trusted contact link" subtitle="Public — opened from SMS, no login required">
+        <DCArtboard id="track" label="Live location share" width={414} height={868}>
+          <Phone><TrackScreen/></Phone>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App/>);
+</script>
+</body>
+</html>
