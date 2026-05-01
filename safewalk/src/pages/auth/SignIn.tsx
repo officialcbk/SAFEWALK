@@ -57,16 +57,9 @@ export default function SignIn() {
       return;
     }
     if (data.session) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('onboarding_completed')
-        .eq('id', data.session.user.id)
-        .single();
-      if (!profile?.onboarding_completed) {
-        navigate('/onboarding', { replace: true });
-      } else {
-        navigate(from, { replace: true });
-      }
+      // Existing users signing in always go straight to the app.
+      // Only new users go through onboarding (handled by the sign-up flow).
+      navigate(from, { replace: true });
     }
   };
 
