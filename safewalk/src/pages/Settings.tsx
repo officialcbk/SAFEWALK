@@ -15,10 +15,25 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
       role="switch"
       aria-checked={on}
       onClick={() => onChange(!on)}
-      className={`w-11 h-[26px] rounded-full transition-colors relative flex-shrink-0 ${on ? 'bg-[#7F77DD]' : 'bg-[#E0E0E8]'}`}
+      style={{
+        width: 50, height: 28, borderRadius: 14, border: 'none', cursor: 'pointer',
+        flexShrink: 0, position: 'relative',
+        background: on ? '#7F77DD' : '#C8C8D4',
+        transition: 'background 0.2s ease',
+      }}
     >
       <span
-        className={`absolute top-[3px] w-5 h-5 bg-white rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.18)] transition-transform ${on ? 'translate-x-[18px]' : 'translate-x-[3px]'}`}
+        style={{
+          position: 'absolute',
+          top: 3, left: 3,
+          width: 22, height: 22,
+          borderRadius: '50%',
+          background: 'white',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.22)',
+          transform: `translateX(${on ? 22 : 0}px)`,
+          transition: 'transform 0.2s ease',
+          display: 'block',
+        }}
       />
     </button>
   );
@@ -132,7 +147,7 @@ export default function Settings() {
             <div className="text-[16px] font-bold text-[#1A1A28] truncate">{displayName}</div>
             <div className="text-[12px] text-[#888899] truncate">{user?.email}</div>
           </div>
-          <button className="h-9 px-3.5 bg-[#EEEDFE] text-[#534AB7] border border-[#DCD9FB] rounded-[14px] text-[13px] font-semibold">
+          <button className="h-9 px-3.5 bg-[#EEEDFE] text-[#534AB7] border border-[#DCD9FB] rounded-[14px] text-[13px] font-semibold flex items-center justify-center">
             Edit
           </button>
         </div>
@@ -219,14 +234,14 @@ export default function Settings() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 h-[52px] rounded-[14px] border border-[#E0E0E8] text-[14px] font-semibold text-[#888899]"
+                className="flex-1 h-[52px] rounded-[14px] border border-[#E0E0E8] text-[14px] font-semibold text-[#888899] flex items-center justify-center"
               >
                 Cancel
               </button>
               <button
                 onClick={deleteAll}
                 disabled={deleteInput !== 'DELETE'}
-                className="flex-1 h-[52px] rounded-[14px] bg-[#E24B4A] text-white text-[14px] font-semibold disabled:opacity-40"
+                className="flex-1 h-[52px] rounded-[14px] bg-[#E24B4A] text-white text-[14px] font-semibold disabled:opacity-40 flex items-center justify-center"
               >
                 Delete
               </button>
