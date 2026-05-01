@@ -20,7 +20,7 @@ export function FinalCTA() {
               Free forever. No credit card. Set up in under two minutes.
             </p>
             <div style={{ display: 'flex', gap: 12, marginTop: 28, flexWrap: 'wrap' }}>
-              <button onClick={() => navigate('/sign-up')} style={{ background: 'white', color: '#534AB7', height: 56, padding: '0 28px', fontSize: 16, borderRadius: 14, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <button onClick={() => navigate('/onboarding')} style={{ background: 'white', color: '#534AB7', height: 56, padding: '0 28px', fontSize: 16, borderRadius: 14, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 Try SafeWalk free
                 <Icons.Chevron color="#534AB7" size={16}/>
               </button>

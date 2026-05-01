@@ -48,7 +48,7 @@ export function Hero() {
           </p>
 
           <div style={{ display: 'flex', gap: 12, marginTop: 30, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button onClick={() => navigate('/sign-up')} style={{ height: 56, padding: '0 26px', fontSize: 16, borderRadius: 14, fontWeight: 700, background: 'linear-gradient(135deg,#7F77DD,#534AB7)', color: 'white', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => navigate('/onboarding')} style={{ height: 56, padding: '0 26px', fontSize: 16, borderRadius: 14, fontWeight: 700, background: 'linear-gradient(135deg,#7F77DD,#534AB7)', color: 'white', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               Try SafeWalk free
               <Icons.Chevron color="white" size={16}/>
             </button>
