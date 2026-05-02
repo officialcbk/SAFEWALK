@@ -99,6 +99,50 @@ export function formatNavDuration(seconds: number): string {
   return rem > 0 ? `${h} h ${rem} min` : `${h} h`;
 }
 
+// ── Human-friendly instruction text ──────────────────────────────────────────
+
+const TURN_DIR: Record<string, string> = {
+  'left':        'left',
+  'sharp left':  'sharp left',
+  'slight left': 'slightly left',
+  'right':       'right',
+  'sharp right': 'sharp right',
+  'slight right':'slightly right',
+  'uturn':       'around',
+};
+
+export function humanizeInstruction(step: RouteStep): string {
+  const { maneuverType, maneuverModifier, name, instruction } = step;
+  const street = name?.trim() || null;
+  const dir    = maneuverModifier ? TURN_DIR[maneuverModifier] ?? null : null;
+
+  if (maneuverType === 'depart') {
+    return instruction.replace(/^Walk\b/, 'Head').replace(/^Go\b/, 'Head') ||
+           (street ? `Head towards ${street}` : 'Start walking');
+  }
+  if (maneuverType === 'arrive') {
+    return street ? `Arriving at ${street}` : 'You have arrived';
+  }
+  if (maneuverType === 'turn' || maneuverType === 'end of road') {
+    if (dir && street) return `Turn ${dir} on ${street}`;
+    if (dir)           return `Turn ${dir}`;
+    return instruction;
+  }
+  if (maneuverType === 'continue' || maneuverType === 'new name') {
+    return street ? `Continue on ${street}` : 'Keep going straight';
+  }
+  if (maneuverType === 'roundabout' || maneuverType === 'rotary') {
+    return dir ? `Take the roundabout, exit ${dir}` : 'Take the roundabout';
+  }
+  if (maneuverType === 'fork') {
+    return dir ? `Keep ${dir}` : 'Keep straight';
+  }
+  if (maneuverType === 'merge') {
+    return street ? `Merge onto ${street}` : 'Merge onto road';
+  }
+  return instruction;
+}
+
 // ── Maneuver icons ────────────────────────────────────────────────────────────
 
 export function maneuverIcon(type: string, modifier?: string): string {

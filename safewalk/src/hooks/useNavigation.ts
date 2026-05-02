@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { useWalkStore } from '../store/walkStore';
 import { getDirections } from '../services/directions';
 import {
+  haversine,
   distanceToPolyline,
   findCurrentStepIndex,
   remainingRouteStats,
@@ -23,6 +24,7 @@ export function useNavigation(isActive: boolean) {
     setRerouting,
     setRouteCoords,
     setNavSteps,
+    setNearDestination,
   } = useWalkStore();
 
   const offRouteCountRef = useRef(0);
@@ -42,7 +44,17 @@ export function useNavigation(isActive: boolean) {
     const { meters, seconds } = remainingRouteStats(stepIdx, navSteps);
     setNavRemaining(meters, seconds);
 
-    // 3. Off-route detection
+    // 3. Arrival detection — haversine to destination pin
+    if (destinationCoords) {
+      const directDist = haversine(point, destinationCoords);
+      if (directDist < 50) {
+        setNearDestination(true);
+      } else if (directDist > 100) {
+        setNearDestination(false);
+      }
+    }
+
+    // 4. Off-route detection
     const distFromRoute = distanceToPolyline(point, routeCoords);
     const offRoute = distFromRoute > OFF_ROUTE_THRESHOLD_M;
 
@@ -53,7 +65,7 @@ export function useNavigation(isActive: boolean) {
       setOffRoute(false);
     }
 
-    // 4. Grace period → reroute
+    // 5. Grace period → reroute
     if (offRouteCountRef.current >= OFF_ROUTE_GRACE_COUNT && !reroutingRef.current && destinationCoords) {
       reroutingRef.current = true;
       setOffRoute(true);

@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { useWalkStore } from '../../store/walkStore';
 
 function HomeIcon({ color }: { color: string }) {
   return (
@@ -42,6 +43,8 @@ const tabs = [
 ] as const;
 
 export function NavBar() {
+  const isWalking = useWalkStore((s) => !!s.walk.sessionId);
+  if (isWalking) return null;
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E0E0E8] flex z-30"

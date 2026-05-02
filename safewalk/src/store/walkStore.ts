@@ -19,6 +19,7 @@ interface WalkStore {
   navRemainingSeconds: number;
   isOffRoute: boolean;
   isRerouting: boolean;
+  nearDestination: boolean;
 
   // Setters
   setWalk: (walk: Partial<ActiveWalkState>) => void;
@@ -35,6 +36,7 @@ interface WalkStore {
   setNavRemaining: (meters: number, seconds: number) => void;
   setOffRoute: (v: boolean) => void;
   setRerouting: (v: boolean) => void;
+  setNearDestination: (v: boolean) => void;
   startWalk: (sessionId: string, shareToken: string) => void;
   endWalk: () => void;
 }
@@ -57,6 +59,7 @@ const NAV_RESET = {
   navRemainingSeconds: 0,
   isOffRoute: false,
   isRerouting: false,
+  nearDestination: false,
 };
 
 export const useWalkStore = create<WalkStore>()(
@@ -82,6 +85,7 @@ export const useWalkStore = create<WalkStore>()(
       setNavRemaining:    (meters, seconds) => set({ navRemainingMeters: meters, navRemainingSeconds: seconds }),
       setOffRoute:        (v) => set({ isOffRoute: v }),
       setRerouting:       (v) => set({ isRerouting: v }),
+      setNearDestination: (v) => set({ nearDestination: v }),
 
       startWalk: (sessionId, shareToken) =>
         set({

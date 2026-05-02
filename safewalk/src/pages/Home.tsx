@@ -10,7 +10,9 @@ import { useGeolocation } from '../hooks/useGeolocation';
 import { useCheckIn } from '../hooks/useCheckIn';
 import { useNavigation } from '../hooks/useNavigation';
 import { getDirections } from '../services/directions';
-import { maneuverIcon, formatNavDistance, formatNavDuration } from '../services/navigation';
+import { maneuverIcon, formatNavDistance, formatNavDuration, humanizeInstruction } from '../services/navigation';
+import { getNearbyPlaces } from '../services/safePlaces';
+import type { SafePlace } from '../services/safePlaces';
 import { MapView } from '../components/map/MapView';
 import { SosButton } from '../components/walk/SosButton';
 import { Avatar } from '../components/ui/Avatar';
@@ -23,6 +25,12 @@ interface Suggestion {
   place_name: string;
   center: [number, number]; // [lng, lat]
 }
+
+// Sheet snap constants
+const IDLE_PEEK   = 72;
+const IDLE_OPEN   = 192;
+const ACTIVE_MINI = 54;
+const ACTIVE_FULL = 272;
 
 // ── Stats query ───────────────────────────────────────────────────────────────
 function useHomeStats(userId: string | undefined) {
@@ -107,7 +115,6 @@ function CheckInOverlay({ onSafe }: { onSafe: () => void }) {
     const id = setInterval(() => setCount((c) => Math.max(0, c - 1)), 1000);
     return () => clearInterval(id);
   }, []);
-
   return (
     <div
       role="dialog" aria-modal="true" aria-labelledby="checkin-title"
@@ -185,7 +192,7 @@ function SosOverlay({ onCancel, contacts }: { onCancel: () => void; contacts: Ar
       <div className="w-full flex flex-col gap-2.5">
         <button
           onClick={onCancel} autoFocus
-          className="w-full h-[52px] rounded-[14px] bg-white/20 text-white font-semibold text-[16px] border border-white/30 active:scale-[0.98]"
+          className="w-full h-[52px] rounded-[14px] bg-white/20 text-white font-semibold text-[16px] border border-white/30 active:scale-[0.98] flex items-center justify-center"
         >
           Cancel SOS — I'm okay
         </button>
@@ -203,6 +210,164 @@ function SosOverlay({ onCancel, contacts }: { onCancel: () => void; contacts: Ar
   );
 }
 
+// ── Arrival prompt ────────────────────────────────────────────────────────────
+function ArrivalPrompt({
+  destination,
+  bottomOffset,
+  onEnd,
+  onDismiss,
+}: {
+  destination: string | null;
+  bottomOffset: number;
+  onEnd: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="absolute left-0 right-0 z-20 px-4" style={{ bottom: bottomOffset }}>
+      <div className="bg-white rounded-[18px] p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.16)]">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#E8F5E9' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2E7D32" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6 9 17l-5-5"/>
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <div className="text-[15px] font-bold text-[#1A1A28]">You've nearly arrived!</div>
+            {destination && <div className="text-[12px] text-[#888899] truncate">{destination}</div>}
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={onDismiss}
+            className="flex-1 h-10 rounded-[12px] bg-[#F0F0F4] text-[13px] font-semibold text-[#888899] flex items-center justify-center"
+          >
+            Keep walking
+          </button>
+          <button
+            onClick={onEnd}
+            className="flex-1 h-10 rounded-[12px] text-[13px] font-semibold text-white flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg,#7F77DD,#534AB7)' }}
+          >
+            End walk
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Discreet help menu ────────────────────────────────────────────────────────
+function DiscreetHelpMenu({
+  shareUrl,
+  onClose,
+  onSOS,
+  onFeelingUneasy,
+  onShowSafePlaces,
+}: {
+  shareUrl: string | null;
+  onClose: () => void;
+  onSOS: () => void;
+  onFeelingUneasy: () => void;
+  onShowSafePlaces: () => void;
+}) {
+  const handleShare = () => {
+    if (!shareUrl) { toast.error('No share link available yet.'); return; }
+    if (navigator.share) {
+      navigator.share({ title: 'Track my walk on SafeWalk', url: shareUrl }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(shareUrl)
+        .then(() => toast.success('Link copied!'))
+        .catch(() => toast.error('Could not copy link.'));
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-40 flex flex-col" style={{ maxWidth: 430, margin: '0 auto' }}>
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative mt-auto z-10 bg-white rounded-[24px_24px_0_0] px-5 pb-8 pt-2 shadow-[0_-10px_40px_rgba(0,0,0,0.18)]">
+        <div className="w-11 h-1 bg-[#D5D5DD] rounded-full mx-auto mt-2 mb-4" />
+        <h2 className="text-[18px] font-bold text-[#1A1A28] mb-0.5">Stay safe</h2>
+        <p className="text-[12px] text-[#888899] mb-4">These options are discreet — no one will see your screen.</p>
+        <div className="flex flex-col gap-2">
+
+          {/* I feel uneasy — primary warm action */}
+          <button
+            onClick={() => { onClose(); onFeelingUneasy(); }}
+            className="flex items-center gap-3.5 w-full p-3.5 rounded-[14px] text-left"
+            style={{ background: '#FFF8EC', border: '1px solid #F5DFB0' }}
+          >
+            <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(234,163,44,0.15)' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#B07A00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 8v4"/><path d="M12 16h.01"/>
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[14px] font-semibold text-[#7A5400]">I feel uneasy</div>
+              <div className="text-[11px] text-[#B07A00]">Show safe places, stay aware</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => { handleShare(); onClose(); }}
+            className="flex items-center gap-3.5 w-full p-3.5 rounded-[14px] bg-[#F6F6FA] border border-[#E0E0E8] text-left"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#534AB7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+              <path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>
+            </svg>
+            <div className="flex-1 min-w-0">
+              <div className="text-[14px] font-semibold text-[#1A1A28]">Share my walk</div>
+              <div className="text-[11px] text-[#888899]">Send your live location link</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => { onClose(); onShowSafePlaces(); }}
+            className="flex items-center gap-3.5 w-full p-3.5 rounded-[14px] bg-[#F6F6FA] border border-[#E0E0E8] text-left"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2E7D32" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/>
+            </svg>
+            <div className="flex-1 min-w-0">
+              <div className="text-[14px] font-semibold text-[#1A1A28]">Find a safe place</div>
+              <div className="text-[11px] text-[#888899]">Police, hospitals, pharmacies nearby</div>
+            </div>
+          </button>
+
+          <a
+            href="tel:911" onClick={onClose}
+            className="flex items-center gap-3.5 p-3.5 rounded-[14px] bg-[#FFF0F0] border border-[#F5C6C6] no-underline"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A32D2D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.6A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 2 .6 2.9a2 2 0 0 1-.5 2L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2-.5c1 .3 2 .5 2.9.6a2 2 0 0 1 1.7 2Z"/>
+            </svg>
+            <div className="flex-1">
+              <div className="text-[14px] font-semibold text-[#A32D2D]">Call emergency services</div>
+              <div className="text-[11px] text-[#C54444]">Connects you to 911 directly</div>
+            </div>
+          </a>
+
+          <button
+            onClick={() => { onClose(); onSOS(); }}
+            className="flex items-center gap-3.5 p-3.5 rounded-[14px] text-left"
+            style={{ background: '#E24B4A' }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+            <div className="flex-1">
+              <div className="text-[14px] font-semibold text-white">Trigger SOS</div>
+              <div className="text-[11px] text-white/80">Alerts all trusted contacts immediately</div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Home ─────────────────────────────────────────────────────────────────
 export default function Home() {
   const navigate  = useNavigate();
@@ -212,22 +377,22 @@ export default function Home() {
     routeCoords, setRouteCoords, destinationCoords, setDestinationCoords,
     navSteps, navStepIndex, navRemainingMeters, navRemainingSeconds,
     isOffRoute, isRerouting, setNavSteps,
+    nearDestination, setNearDestination,
   } = useWalkStore();
   const { location, startTracking, stopTracking } = useGeolocation();
   const stats = useHomeStats(user?.id);
   const timer = useSessionTimer(walk.startedAt ? new Date(walk.startedAt) : null);
 
   const isActive = !!walk.sessionId;
-
-  // Navigation engine (runs when walk is active)
   useNavigation(isActive);
 
+  // ── UI state ──────────────────────────────────────────────────────────────
   const [showEndConfirm, setShowEndConfirm]   = useState(false);
   const [showCheckIn, setShowCheckIn]         = useState(false);
   const [showSosOverlay, setShowSosOverlay]   = useState(false);
   const [sosContacts, setSosContacts]         = useState<Array<{ name: string; phone: string }>>([]);
 
-  // Destination UI state
+  // Destination
   const [destinationText, setDestinationText] = useState(walk.destination ?? '');
   const [destSelected, setDestSelected]       = useState(!!walk.destination && !!destinationCoords);
   const [suggestions, setSuggestions]         = useState<Suggestion[]>([]);
@@ -235,38 +400,53 @@ export default function Home() {
   const [routeDistance, setRouteDistance]     = useState<number | null>(null);
   const [routeDuration, setRouteDuration]     = useState<number | null>(null);
 
-  // Map follow mode
+  // Map follow
   const [followUser, setFollowUser] = useState(true);
 
-  // Active walk sheet: collapsable
+  // Sheet state
+  // Active walk: collapsed (mini peek) vs expanded (full controls)
   const [sheetCollapsed, setSheetCollapsed] = useState(false);
-  const dragRef = useRef<{ startY: number; collapsed: boolean } | null>(null);
+  // Idle: peek vs open
+  const [idleOpen, setIdleOpen] = useState(true);
+  // Live drag height (null = not dragging, use snap height)
+  const [dragHeight, setDragHeight] = useState<number | null>(null);
+
+  // Safe places
+  const [showSafePlaces, setShowSafePlaces]       = useState(false);
+  const [safePlaces, setSafePlaces]               = useState<SafePlace[]>([]);
+  const [safePlacesLoading, setSafePlacesLoading] = useState(false);
+
+  // Help / arrival
+  const [showHelpMenu, setShowHelpMenu]       = useState(false);
+  const [arrivalDismissed, setArrivalDismissed] = useState(false);
 
   const [currentLoc, setCurrentLoc] = useState<LatLng | null>(walk.currentLocation);
 
+  // Refs
   const suggestionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const destCoordsRef   = useRef<[number, number] | null>(destinationCoords);
   const locRef          = useRef<LatLng | null>(null);
   const isActiveRef     = useRef(false);
   isActiveRef.current   = isActive;
 
+  // Drag ref: tracks pointer capture for the sheet handle
+  const dragRef = useRef<{ startY: number; startH: number } | null>(null);
+
   useEffect(() => { destCoordsRef.current = destinationCoords; }, [destinationCoords]);
 
-  // Always track GPS so location is available for route preview before a walk starts
+  // ── GPS always on ─────────────────────────────────────────────────────────
   useEffect(() => {
     startTracking();
     return () => stopTracking();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sync GPS → map marker always; store + ping only during active walk
+  // Sync GPS → map + store pings
   useEffect(() => {
     if (!location) return;
     const ll: LatLng = { lat: location.lat, lng: location.lng };
     setCurrentLoc(ll);
     locRef.current = ll;
-
     if (!walk.sessionId) return;
-
     setLocation(ll);
     supabase.from('location_pings').insert({
       session_id: walk.sessionId, user_id: user?.id,
@@ -275,7 +455,7 @@ export default function Home() {
     });
   }, [location, walk.sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Fetch directions (Mapbox) ─────────────────────────────────────────────
+  // ── Route fetch ───────────────────────────────────────────────────────────
   const fetchRoute = useCallback(async (from: [number, number], to: [number, number]) => {
     setRouteLoading(true);
     try {
@@ -308,8 +488,7 @@ export default function Home() {
     }, 280);
   }, []);
 
-  // ── Destination text input — only updates text and fetches suggestions ───────
-  // Routes are ONLY fetched when the user explicitly selects a suggestion.
+  // ── Destination input ─────────────────────────────────────────────────────
   const handleDestinationInput = useCallback((value: string) => {
     setDestinationText(value);
     setDestSelected(false);
@@ -322,7 +501,7 @@ export default function Home() {
     setRouteDuration(null);
   }, [setDestination, setRouteCoords, setNavSteps, setDestinationCoords]);
 
-  // ── Suggestion select — the only place that triggers a route fetch ───────────
+  // ── Suggestion select ─────────────────────────────────────────────────────
   const handleSuggestionSelect = useCallback((s: Suggestion) => {
     if (suggestionTimer.current) clearTimeout(suggestionTimer.current);
     setSuggestions([]);
@@ -330,17 +509,18 @@ export default function Home() {
     setDestination(s.place_name);
     setRouteCoords(null);
     setNavSteps(null);
-    destCoordsRef.current = s.center; // [lng, lat]
+    destCoordsRef.current = s.center;
     setDestinationCoords(s.center);
     setDestSelected(true);
     setRouteDistance(null);
     setRouteDuration(null);
+    // Collapse idle sheet to give the map more room for route preview
+    setIdleOpen(false);
 
     const dest = s.center;
     if (locRef.current) {
       fetchRoute([locRef.current.lng, locRef.current.lat], dest);
     } else {
-      // GPS hasn't delivered a fix yet — do a one-shot lookup
       navigator.geolocation?.getCurrentPosition(
         (pos) => {
           const from: [number, number] = [pos.coords.longitude, pos.coords.latitude];
@@ -367,7 +547,46 @@ export default function Home() {
     setRouteDistance(null);
     setRouteDuration(null);
     setSuggestions([]);
+    setIdleOpen(true);
   }, [setDestination, setRouteCoords, setNavSteps, setDestinationCoords]);
+
+  // ── "I feel uneasy" ───────────────────────────────────────────────────────
+  const handleFeelingUneasy = useCallback(async () => {
+    toast('Showing safe places nearby. Stay calm — you\'re being tracked.', { icon: '🛡' });
+    if (!showSafePlaces) {
+      setShowSafePlaces(true);
+      if (safePlaces.length > 0) return;
+      if (!locRef.current) return;
+      setSafePlacesLoading(true);
+      try {
+        const token = import.meta.env.VITE_MAPBOX_TOKEN as string;
+        const places = await getNearbyPlaces([locRef.current.lng, locRef.current.lat], token);
+        setSafePlaces(places);
+      } finally {
+        setSafePlacesLoading(false);
+      }
+    }
+  }, [showSafePlaces, safePlaces.length]);
+
+  // ── Safe places ───────────────────────────────────────────────────────────
+  const handleToggleSafePlaces = useCallback(async () => {
+    if (showSafePlaces) { setShowSafePlaces(false); return; }
+    setShowSafePlaces(true);
+    if (safePlaces.length > 0) return;
+    if (!locRef.current) return;
+    setSafePlacesLoading(true);
+    try {
+      const token = import.meta.env.VITE_MAPBOX_TOKEN as string;
+      const places = await getNearbyPlaces([locRef.current.lng, locRef.current.lat], token);
+      setSafePlaces(places);
+    } finally {
+      setSafePlacesLoading(false);
+    }
+  }, [showSafePlaces, safePlaces.length]);
+
+  useEffect(() => {
+    if (nearDestination) setShowSafePlaces(false);
+  }, [nearDestination]);
 
   // ── Check-in ──────────────────────────────────────────────────────────────
   const { checkInSecondsLeft, reset: resetCheckIn } = useCheckIn(
@@ -396,7 +615,10 @@ export default function Home() {
     startTracking();
     setFollowUser(true);
     setSheetCollapsed(false);
-    // Fetch route if destination already set
+    setShowSafePlaces(false);
+    setSafePlaces([]);
+    setShowHelpMenu(false);
+    setArrivalDismissed(false);
     if (destCoordsRef.current && locRef.current) {
       fetchRoute([locRef.current.lng, locRef.current.lat], destCoordsRef.current);
     }
@@ -426,6 +648,12 @@ export default function Home() {
     destCoordsRef.current = null;
     setFollowUser(true);
     setSheetCollapsed(false);
+    setIdleOpen(true);
+    setShowSafePlaces(false);
+    setSafePlaces([]);
+    setShowHelpMenu(false);
+    setArrivalDismissed(false);
+    setNearDestination(false);
     const dist = (walk.distanceMeters / 1000).toFixed(1);
     const secs = walk.startedAt ? differenceInSeconds(new Date(), new Date(walk.startedAt)) : 0;
     const dur = formatDuration(intervalToDuration({ start: 0, end: secs * 1000 }), { format: ['hours', 'minutes'] });
@@ -466,42 +694,88 @@ export default function Home() {
     toast.success("Glad you're safe. Emergency cancelled.");
   };
 
-  // ── Derived values ────────────────────────────────────────────────────────
-  const initials = profile?.avatar_initials ?? profile?.full_name?.slice(0, 2).toUpperCase() ?? 'SW';
-  const checkInMax = 90;
-  const checkInPct = Math.max(0, Math.min(100, (checkInSecondsLeft / checkInMax) * 100));
-  const checkInMin = Math.floor(checkInSecondsLeft / 60);
-  const checkInSec = checkInSecondsLeft % 60;
+  // ── Derived heights ───────────────────────────────────────────────────────
+  const initials    = profile?.avatar_initials ?? profile?.full_name?.slice(0, 2).toUpperCase() ?? 'SW';
+  const checkInMax  = 90;
+  const checkInPct  = Math.max(0, Math.min(100, (checkInSecondsLeft / checkInMax) * 100));
+  const checkInMin  = Math.floor(checkInSecondsLeft / 60);
+  const checkInSec  = checkInSecondsLeft % 60;
+  const currentStep = navSteps?.[navStepIndex];
 
-  const currentStep    = navSteps?.[navStepIndex];
-  const activeSheetH   = sheetCollapsed ? 54 : 232;
-  const sheetHeight    = isActive ? activeSheetH : (destSelected && routeCoords ? 188 : 168);
+  const baseSheetH = isActive
+    ? (sheetCollapsed ? ACTIVE_MINI : ACTIVE_FULL)
+    : (idleOpen ? IDLE_OPEN : IDLE_PEEK);
+  const sheetHeight    = dragHeight ?? baseSheetH;
   const recenterBottom = sheetHeight + 12;
 
+  // Whether the full idle content is visible (for smooth appearance/disappearance)
+  const showIdleContent = dragHeight != null ? dragHeight > 110 : idleOpen;
+
+  // ── Unified sheet drag handler ────────────────────────────────────────────
+  const minH = isActive ? ACTIVE_MINI : IDLE_PEEK;
+  const maxH = isActive ? ACTIVE_FULL : IDLE_OPEN;
+
+  const handleDragStart = (e: React.PointerEvent) => {
+    dragRef.current = { startY: e.clientY, startH: sheetHeight };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handleDragMove = (e: React.PointerEvent) => {
+    if (!dragRef.current) return;
+    const dy = dragRef.current.startY - e.clientY; // positive = dragged up
+    const newH = Math.max(minH, Math.min(maxH, dragRef.current.startH + dy));
+    setDragHeight(newH);
+  };
+
+  const handleDragEnd = (e: React.PointerEvent) => {
+    if (!dragRef.current) return;
+    const dy = dragRef.current.startY - e.clientY;
+    setDragHeight(null);
+    dragRef.current = null;
+
+    if (isActive) {
+      if (Math.abs(dy) < 8) {
+        setSheetCollapsed((c) => !c);
+      } else {
+        setSheetCollapsed(dy < 0); // down = collapse, up = expand
+      }
+    } else {
+      if (Math.abs(dy) < 8) {
+        setIdleOpen((o) => !o);
+      } else {
+        setIdleOpen(dy > 0); // up = open, down = peek
+      }
+    }
+  };
+
+  const handleDragCancel = () => { setDragHeight(null); dragRef.current = null; };
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
       {showCheckIn && !showSosOverlay && <CheckInOverlay onSafe={handleSafe} />}
       {showSosOverlay && <SosOverlay onCancel={handleCancelSOS} contacts={sosContacts} />}
 
-      <div className="relative w-full bg-[#EEF1F6]" style={{ height: 'calc(100vh - 78px)' }}>
+      {/* Main viewport — all absolute children position relative to this */}
+      <div className="relative w-full bg-[#EEF1F6]" style={{ height: isActive ? '100vh' : 'calc(100vh - 78px)' }}>
 
-        {/* ── Map (full background) ─────────────────────────────────────── */}
+        {/* ── Map ──────────────────────────────────────────────────────── */}
         <div className="absolute inset-0">
           <MapView
             location={currentLoc}
             heading={location?.bearing}
             routeCoords={routeCoords}
             destinationCoords={destinationCoords}
+            safePlaces={showSafePlaces ? safePlaces : []}
             isActive={isActive}
             followUser={followUser}
             onUserInteract={() => setFollowUser(false)}
           />
         </div>
 
-        {/* ── Active walk: top status bar ───────────────────────────────── */}
+        {/* ── Active: top status bar ────────────────────────────────────── */}
         {isActive && (
           <div className="absolute top-0 left-0 right-0 z-20">
-            {/* Walk status row */}
             <div className="flex items-center justify-between px-4 py-2.5 bg-white/96 backdrop-blur-sm border-b border-[#E0E0E8]">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-[#3B6D11] animate-pulse" />
@@ -512,45 +786,55 @@ export default function Home() {
 
             {/* Direction banner */}
             {isRerouting ? (
-              <div className="mx-3 mt-2 bg-[#E8A020] rounded-[16px] px-4 py-3 flex items-center gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.14)]">
-                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 text-[20px]">↻</div>
+              <div className="mx-3 mt-2 bg-[#E8A020] rounded-[14px] px-3.5 py-2.5 flex items-center gap-3 shadow-[0_2px_12px_rgba(0,0,0,0.12)]">
+                <div className="w-8 h-8 rounded-[8px] bg-white/20 flex items-center justify-center flex-shrink-0 text-[16px]">↻</div>
                 <div>
-                  <div className="text-white font-bold text-[15px]">Rerouting…</div>
-                  <div className="text-white/80 text-[12px]">Finding a new route</div>
+                  <div className="text-white font-bold text-[14px]">Rerouting…</div>
+                  <div className="text-white/80 text-[12px]">Finding a new path for you</div>
                 </div>
               </div>
             ) : isOffRoute ? (
-              <div className="mx-3 mt-2 bg-[#E24B4A] rounded-[16px] px-4 py-3 flex items-center gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.14)]">
-                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 text-[20px]">⚠</div>
+              <div className="mx-3 mt-2 bg-[#E24B4A] rounded-[14px] px-3.5 py-2.5 flex items-center gap-3 shadow-[0_2px_12px_rgba(0,0,0,0.12)]">
+                <div className="w-8 h-8 rounded-[8px] bg-white/20 flex items-center justify-center flex-shrink-0 text-[16px]">⚠</div>
                 <div>
-                  <div className="text-white font-bold text-[15px]">Off route</div>
-                  <div className="text-white/80 text-[12px]">Calculating new route…</div>
+                  <div className="text-white font-bold text-[14px]">Off route</div>
+                  <div className="text-white/80 text-[12px]">Calculating a new route…</div>
                 </div>
               </div>
             ) : currentStep ? (
-              <div
-                className="mx-3 mt-2 bg-white rounded-[16px] px-4 py-3 flex items-center gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.12)]"
-              >
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-[22px] font-bold"
-                  style={{ background: '#534AB7', color: 'white' }}
-                >
-                  {maneuverIcon(currentStep.maneuverType, currentStep.maneuverModifier)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[15px] font-bold text-[#1A1A28] truncate">{currentStep.instruction}</div>
-                  {navSteps && navStepIndex < navSteps.length - 1 && navSteps[navStepIndex + 1] && (
-                    <div className="text-[12px] text-[#6F6F84] mt-0.5">
-                      Then: {navSteps[navStepIndex + 1].instruction}
+              <>
+                <div className="mx-3 mt-2 bg-white rounded-[14px] px-3.5 py-2.5 flex items-center gap-3 shadow-[0_2px_10px_rgba(0,0,0,0.08)]">
+                  <div
+                    className="w-9 h-9 rounded-[10px] flex items-center justify-center flex-shrink-0 text-[18px] font-bold"
+                    style={{ background: '#534AB7', color: 'white' }}
+                  >
+                    {maneuverIcon(currentStep.maneuverType, currentStep.maneuverModifier)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[14px] font-bold text-[#1A1A28] leading-snug">
+                      {humanizeInstruction(currentStep)}
+                    </div>
+                    {navSteps && navStepIndex < navSteps.length - 1 && navSteps[navStepIndex + 1] && (
+                      <div className="text-[12px] text-[#6F6F84] mt-0.5 leading-snug">
+                        then {humanizeInstruction(navSteps[navStepIndex + 1]).toLowerCase()}
+                      </div>
+                    )}
+                  </div>
+                  {currentStep.distance > 30 && (
+                    <div className="flex-shrink-0 bg-[#EEEDFE] rounded-full px-2.5 py-1">
+                      <span className="text-[12px] font-bold text-[#534AB7]">{formatNavDistance(currentStep.distance)}</span>
                     </div>
                   )}
                 </div>
-                {currentStep.distance > 0 && (
-                  <div className="text-right flex-shrink-0">
-                    <div className="text-[14px] font-bold text-[#534AB7]">{formatNavDistance(currentStep.distance)}</div>
-                  </div>
-                )}
-              </div>
+                {/* Safety status line */}
+                <div className="mx-4 mt-1.5 flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] text-[#6F6F84]">On route</span>
+                  <span className="text-[#D0D0DA]">·</span>
+                  <span className="text-[11px] text-[#6F6F84]">Check-in active</span>
+                  <span className="text-[#D0D0DA]">·</span>
+                  <span className="text-[11px] text-[#6F6F84]">Location sharing</span>
+                </div>
+              </>
             ) : null}
           </div>
         )}
@@ -571,56 +855,35 @@ export default function Home() {
 
         {/* ── Recenter FAB ──────────────────────────────────────────────── */}
         {!followUser && (
-          <div
-            className="absolute right-4 z-20 transition-all"
-            style={{ bottom: recenterBottom }}
-          >
+          <div className="absolute right-4 z-20 transition-all" style={{ bottom: recenterBottom }}>
             <RecenterButton onPress={() => setFollowUser(true)} />
           </div>
         )}
 
         {/* ── Bottom sheet ──────────────────────────────────────────────── */}
         <div
-          className="absolute bottom-0 left-0 right-0 bg-white z-20 transition-all duration-300"
+          className="absolute bottom-0 left-0 right-0 bg-white z-20"
           style={{
             height: sheetHeight,
             borderRadius: '20px 20px 0 0',
             boxShadow: '0 -4px 24px rgba(0,0,0,0.10)',
+            // CSS transition only when not actively dragging (no drag = dragRef is null)
+            transition: dragRef.current ? 'none' : 'height 0.28s cubic-bezier(0.4,0,0.2,1)',
           }}
         >
-          {/* Drag handle — active during walk, tap/drag to collapse/expand */}
+          {/* Drag handle — works for both active and idle sheets */}
           <div
             className="flex justify-center pt-2.5 pb-1 cursor-grab active:cursor-grabbing select-none"
-            onPointerDown={(e) => {
-              if (!isActive) return;
-              dragRef.current = { startY: e.clientY, collapsed: sheetCollapsed };
-              (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-            }}
-            onPointerMove={() => {
-              // no-op — we snap on release only
-            }}
-            onPointerUp={(e) => {
-              if (!dragRef.current || !isActive) return;
-              const dy = dragRef.current.startY - e.clientY; // positive = dragged up
-              if (Math.abs(dy) < 8) {
-                // tap → toggle
-                setSheetCollapsed((c) => !c);
-              } else if (dy < -24) {
-                // dragged down → collapse
-                setSheetCollapsed(true);
-              } else if (dy > 24) {
-                // dragged up → expand
-                setSheetCollapsed(false);
-              }
-              dragRef.current = null;
-            }}
-            onPointerCancel={() => { dragRef.current = null; }}
+            onPointerDown={handleDragStart}
+            onPointerMove={handleDragMove}
+            onPointerUp={handleDragEnd}
+            onPointerCancel={handleDragCancel}
           >
             <div className="w-10 h-1 bg-[#D5D5DD] rounded-full" />
           </div>
 
-          {/* Collapsed active walk peek */}
-          {isActive && sheetCollapsed && (
+          {/* ── Active walk: collapsed peek ──────────────────────────── */}
+          {isActive && sheetCollapsed && !dragHeight && (
             <div className="flex items-center justify-between px-5 pt-0.5">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-[#3B6D11] animate-pulse" />
@@ -629,14 +892,136 @@ export default function Home() {
                   <span className="text-[12px] text-[#6F6F84]">· {formatNavDistance(navRemainingMeters)} left</span>
                 )}
               </div>
-              <span className="text-[11px] text-[#888899] font-medium">Swipe up to expand</span>
+              <span className="text-[11px] text-[#888899] font-medium">Swipe up</span>
             </div>
           )}
 
-          {!isActive ? (
-            /* ── IDLE SHEET ─────────────────────────────────────────── */
-            <div className="px-4 pt-3 flex flex-col gap-2.5">
+          {/* ── Idle: peek row ───────────────────────────────────────── */}
+          {!isActive && !showIdleContent && (
+            <button
+              className="w-full flex items-center gap-2.5 px-4 py-1.5 text-left"
+              onClick={() => setIdleOpen(true)}
+            >
+              {destSelected ? (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#534AB7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
+                  </svg>
+                  <span className="flex-1 text-[14px] font-semibold text-[#1A1A28] truncate">{destinationText}</span>
+                  <span className="text-[12px] text-[#534AB7] font-semibold flex-shrink-0">Expand</span>
+                </>
+              ) : (
+                <>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#888899" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
+                  </svg>
+                  <span className="text-[14px] text-[#888899]">Where are you going?</span>
+                </>
+              )}
+            </button>
+          )}
 
+          {/* ── Active walk: full controls ───────────────────────────── */}
+          {isActive && (
+            <div
+              className="flex flex-col gap-2.5 px-4 pt-2"
+              style={{ visibility: (!sheetCollapsed || dragHeight != null) ? 'visible' : 'hidden', opacity: dragHeight != null ? Math.min(1, (sheetHeight - ACTIVE_MINI) / 60) : 1 }}
+            >
+              {/* Check-in countdown — urgent style when ≤ 20 s */}
+              {(() => {
+                const urgent = checkInSecondsLeft <= 20;
+                const label = checkInSecondsLeft <= 0
+                  ? 'Checking in now…'
+                  : checkInSecondsLeft < 60
+                    ? `in ${checkInSecondsLeft} sec`
+                    : `in ${checkInMin}:${String(checkInSec).padStart(2, '0')}`;
+                return (
+                  <div
+                    className="rounded-[14px] px-4 py-2.5 transition-colors duration-500"
+                    style={{ background: urgent ? '#FFF4E6' : '#EEEDFE' }}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[12px] font-semibold" style={{ color: urgent ? '#B06000' : '#534AB7' }}>
+                        Next check-in
+                      </span>
+                      <span
+                        className="text-[13px] font-bold tabular-nums"
+                        style={{ color: urgent ? '#B06000' : '#534AB7' }}
+                        aria-live="polite"
+                      >
+                        {label}
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: urgent ? '#F5D8A8' : '#DCD9FB' }}>
+                      <div
+                        className="h-full rounded-full transition-all duration-1000"
+                        style={{ width: `${checkInPct}%`, background: urgent ? '#E8890A' : '#7F77DD' }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Stats — single connected panel */}
+              <div className="flex bg-[#F6F6FA] rounded-[14px] overflow-hidden border border-[#EDEDF2]">
+                {[
+                  { label: 'Time',      value: timer },
+                  { label: 'Remaining', value: navRemainingMeters > 0 ? formatNavDistance(navRemainingMeters) : `${(walk.distanceMeters / 1000).toFixed(1)} km` },
+                  { label: 'ETA',       value: navRemainingSeconds > 0 ? formatNavDuration(navRemainingSeconds) : '—' },
+                ].map(({ label, value }, i) => (
+                  <div key={label} className={`flex-1 px-3 py-2.5 ${i > 0 ? 'border-l border-[#E4E4ED]' : ''}`}>
+                    <div className="text-[10px] text-[#999AAA] font-medium uppercase tracking-wide">{label}</div>
+                    <div className="text-[13px] font-bold text-[#1A1A28] tabular-nums mt-0.5">{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Safe places toggle */}
+              <button
+                onClick={handleToggleSafePlaces}
+                className="w-full h-8 rounded-[10px] text-[12px] font-semibold flex items-center justify-center gap-1.5 border"
+                style={{
+                  background:  showSafePlaces ? '#534AB7' : '#F6F6FA',
+                  borderColor: showSafePlaces ? '#534AB7' : '#E0E0E8',
+                  color:       showSafePlaces ? 'white'   : '#534AB7',
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/>
+                </svg>
+                {showSafePlaces ? 'Hide safe places' : 'Show safe places nearby'}
+              </button>
+
+              {/* SOS + I feel uneasy + End walk */}
+              <div className="flex items-stretch gap-2.5">
+                <SosButton onActivated={handleSOS} />
+                <div className="flex-1 flex flex-col gap-1.5">
+                  <button
+                    onClick={() => setShowHelpMenu(true)}
+                    className="flex-1 rounded-[12px] text-[13px] font-semibold flex items-center justify-center gap-1.5 border"
+                    style={{ background: '#FFF8EC', borderColor: '#F5DFB0', color: '#7A5400', minHeight: 40 }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>
+                    </svg>
+                    I feel uneasy
+                  </button>
+                  <button
+                    onClick={() => setShowEndConfirm(true)}
+                    className="flex-1 rounded-[12px] bg-[#F0F0F4] text-[#888899] border border-[#E0E0E8] font-medium text-[13px] flex items-center justify-center"
+                    style={{ minHeight: 36 }}
+                  >
+                    End walk
+                  </button>
+                </div>
+              </div>
+              <p className="text-[10px] text-[#AAAABC] text-center -mt-1.5">Hold SOS 3 s to alert your contacts</p>
+            </div>
+          )}
+
+          {/* ── Idle: full content ───────────────────────────────────── */}
+          {!isActive && showIdleContent && (
+            <div className="px-4 pt-1 flex flex-col gap-2.5">
               {destSelected && destinationCoords ? (
                 /* Compact destination chip */
                 <div className="flex items-center gap-2 bg-[#F0F0F4] rounded-[14px] px-3.5" style={{ height: 50 }}>
@@ -674,6 +1059,7 @@ export default function Home() {
                       placeholder="Where are you going?"
                       value={destinationText}
                       onChange={(e) => { handleDestinationInput(e.target.value); fetchSuggestions(e.target.value); }}
+                      onFocus={() => setIdleOpen(true)}
                       onBlur={() => setTimeout(() => setSuggestions([]), 150)}
                       className="flex-1 text-[15px] text-[#1A1A28] placeholder:text-[#888899] bg-transparent outline-none"
                     />
@@ -685,7 +1071,6 @@ export default function Home() {
                       </button>
                     )}
                   </div>
-
                   {suggestions.length > 0 && (
                     <div className="absolute left-0 right-0 bottom-full mb-2 bg-white rounded-[14px] border border-[#E0E0E8] overflow-hidden z-10 shadow-[0_-8px_24px_rgba(0,0,0,0.10)]">
                       {suggestions.map((s, i) => {
@@ -715,7 +1100,7 @@ export default function Home() {
               {/* Start walk button */}
               <button
                 onClick={handleStart}
-                className="w-full h-[50px] rounded-[14px] text-white font-bold text-[15px] transition-colors active:scale-[0.98] flex items-center justify-center"
+                className="w-full h-[50px] rounded-[14px] text-white font-bold text-[15px] active:scale-[0.98] flex items-center justify-center"
                 style={{
                   background: 'linear-gradient(135deg,#7F77DD,#534AB7)',
                   boxShadow: '0 4px 16px rgba(127,119,221,0.38)',
@@ -724,7 +1109,7 @@ export default function Home() {
                 Start walk
               </button>
 
-              {/* Quick stats row */}
+              {/* Quick stats */}
               <div className="flex gap-2">
                 {[
                   { label: 'Walks this month', value: stats.data?.walks ?? '—' },
@@ -738,54 +1123,84 @@ export default function Home() {
                 ))}
               </div>
             </div>
-          ) : (
-            /* ── ACTIVE WALK SHEET ──────────────────────────────────── */
-            <div className={`flex flex-col gap-2.5 px-4 pt-2 ${sheetCollapsed ? 'invisible' : ''}`}>
-
-              {/* Check-in countdown */}
-              <div className="bg-[#EEEDFE] rounded-[14px] px-4 py-2.5">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[12px] font-semibold text-[#534AB7]">Next check-in</span>
-                  <span className="text-[13px] font-bold text-[#534AB7] tabular-nums" aria-live="polite">
-                    {checkInMin}:{String(checkInSec).padStart(2, '0')}
-                  </span>
-                </div>
-                <div className="h-1.5 bg-[#DCD9FB] rounded-full overflow-hidden">
-                  <div className="h-full bg-[#7F77DD] rounded-full transition-all duration-1000" style={{ width: `${checkInPct}%` }} />
-                </div>
-              </div>
-
-              {/* Distance / ETA / Time stats */}
-              <div className="flex gap-2">
-                {[
-                  { label: 'Time',      value: timer },
-                  { label: 'Remaining', value: navRemainingMeters > 0 ? formatNavDistance(navRemainingMeters) : `${(walk.distanceMeters / 1000).toFixed(2)} km` },
-                  { label: 'ETA',       value: navRemainingSeconds > 0 ? formatNavDuration(navRemainingSeconds) : '—' },
-                ].map(({ label, value }) => (
-                  <div key={label} className="flex-1 bg-[#F6F6FA] rounded-[12px] px-2.5 py-2">
-                    <div className="text-[10px] text-[#888899] font-medium">{label}</div>
-                    <div className="text-[13px] font-bold text-[#1A1A28] tabular-nums tracking-[-0.2px]">{value}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* SOS + End */}
-              <div className="flex items-center gap-3">
-                <SosButton onActivated={handleSOS} />
-                <div className="flex-1">
-                  <button
-                    onClick={() => setShowEndConfirm(true)}
-                    className="w-full h-[44px] rounded-[14px] bg-[#EEEDFE] text-[#534AB7] border border-[#DCD9FB] font-semibold text-[14px] flex items-center justify-center"
-                  >
-                    End walk
-                  </button>
-                  <p className="text-[10px] text-[#888899] text-center mt-1">Hold SOS 3 s to alert contacts</p>
-                </div>
-              </div>
-            </div>
           )}
         </div>
+
+        {/* ── Safe places panel (inside container so absolute works) ──── */}
+        {isActive && showSafePlaces && (
+          <div className="absolute left-0 right-0 z-20 px-4" style={{ bottom: sheetHeight + 8 }}>
+            <div className="bg-white rounded-[18px] shadow-[0_-4px_20px_rgba(0,0,0,0.12)] overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#F0F0F4]">
+                <span className="text-[13px] font-bold text-[#1A1A28]">Nearby safe places</span>
+                <div className="flex items-center gap-2">
+                  {safePlacesLoading && (
+                    <div className="w-4 h-4 border-2 border-[#534AB7]/30 border-t-[#534AB7] rounded-full animate-spin" />
+                  )}
+                  <button
+                    onClick={() => setShowSafePlaces(false)}
+                    className="w-6 h-6 rounded-full bg-[#F0F0F4] flex items-center justify-center"
+                    aria-label="Close safe places"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#888899" strokeWidth="3" strokeLinecap="round">
+                      <path d="M18 6 6 18M6 6l12 12"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              {!safePlacesLoading && safePlaces.length === 0 && (
+                <div className="px-4 py-3 text-[13px] text-[#888899]">No safe places found nearby.</div>
+              )}
+              {safePlaces.slice(0, 5).map((place, i) => {
+                const cfg = {
+                  police:   { label: 'Police',   color: '#1565C0' },
+                  hospital: { label: 'Hospital', color: '#2E7D32' },
+                  pharmacy: { label: 'Pharmacy', color: '#00695C' },
+                }[place.type];
+                return (
+                  <div
+                    key={place.id}
+                    className="flex items-center gap-3 px-4 py-2.5"
+                    style={{ borderBottom: i < Math.min(safePlaces.length, 5) - 1 ? '1px solid #F0F0F4' : 'none' }}
+                  >
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[11px] font-bold"
+                      style={{ background: cfg.color }}
+                    >
+                      {place.type === 'police' ? 'P' : place.type === 'hospital' ? 'H' : 'Rx'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-semibold text-[#1A1A28] truncate">{place.name}</div>
+                      <div className="text-[11px] text-[#888899] truncate">{place.address}</div>
+                    </div>
+                    <span className="text-[11px] font-semibold flex-shrink-0" style={{ color: cfg.color }}>{cfg.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Arrival prompt (inside container) ────────────────────────── */}
+        {isActive && nearDestination && !arrivalDismissed && !showSosOverlay && (
+          <ArrivalPrompt
+            destination={walk.destination}
+            bottomOffset={sheetHeight + 8}
+            onEnd={() => { setArrivalDismissed(true); setNearDestination(false); setShowEndConfirm(true); }}
+            onDismiss={() => { setArrivalDismissed(true); setNearDestination(false); }}
+          />
+        )}
       </div>
+
+      {/* ── Help menu (fixed, OK outside container) ────────────────────── */}
+      {showHelpMenu && (
+        <DiscreetHelpMenu
+          shareUrl={walk.shareToken ? `${window.location.origin}/track/${walk.shareToken}` : null}
+          onClose={() => setShowHelpMenu(false)}
+          onSOS={() => { setShowHelpMenu(false); handleSOS(); }}
+          onFeelingUneasy={() => { setShowHelpMenu(false); handleFeelingUneasy(); }}
+          onShowSafePlaces={() => { setShowHelpMenu(false); if (!showSafePlaces) handleToggleSafePlaces(); }}
+        />
+      )}
 
       <ConfirmDialog
         isOpen={showEndConfirm}
