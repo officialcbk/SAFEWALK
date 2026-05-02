@@ -133,17 +133,21 @@ export default function Contacts() {
   return (
     <div className="min-h-full bg-[#F0F0F4]">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-3 pb-3 bg-[#F0F0F4]">
-        <h1 className="text-[26px] font-bold text-[#1A1A28] tracking-[-0.5px]">Contacts</h1>
+      <div className="flex items-center justify-between px-5 pt-4 pb-3 bg-[#F0F0F4]">
+        <div>
+          <h1 className="text-[26px] font-bold text-[#1A1A28] tracking-[-0.5px]">Contacts</h1>
+          <p className="text-[12px] text-[#888899] mt-0.5">Up to 5 trusted contacts</p>
+        </div>
         <button
           onClick={openAdd}
-          className="flex items-center gap-1.5 bg-[#7F77DD] text-white rounded-full px-3.5 font-semibold text-[13px] h-10"
           disabled={contacts.length >= 5}
+          className="flex items-center gap-2 rounded-[14px] px-4 font-semibold text-[13px] h-[42px] disabled:opacity-40"
+          style={{ background: 'linear-gradient(135deg,#7F77DD,#534AB7)', color: 'white', boxShadow: '0 4px 14px rgba(83,74,183,0.30)' }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
             <path d="M12 5v14M5 12h14"/>
           </svg>
-          Add
+          Add contact
         </button>
       </div>
 
@@ -166,14 +170,31 @@ export default function Contacts() {
             ))}
           </div>
         ) : contacts.length === 0 ? (
-          <div className="bg-white rounded-[14px] p-8 text-center border border-[#E0E0E8]">
-            <p className="text-[15px] font-semibold text-[#1A1A28] mb-1">No trusted contacts yet</p>
-            <p className="text-[13px] text-[#888899]">Add at least one person who should be notified if you need help.</p>
+          <div className="bg-white rounded-[18px] px-6 py-10 text-center border border-[#E8E8F0]" style={{ boxShadow: '0 2px 16px rgba(0,0,0,0.06)' }}>
+            <div
+              className="w-16 h-16 rounded-[20px] flex items-center justify-center mx-auto mb-4"
+              style={{ background: 'linear-gradient(135deg,#EEEDFE,#DCD9FB)' }}
+            >
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#534AB7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <line x1="19" y1="8" x2="19" y2="14"/>
+                <line x1="22" y1="11" x2="16" y2="11"/>
+              </svg>
+            </div>
+            <p className="text-[16px] font-bold text-[#1A1A28] mb-1.5 tracking-[-0.2px]">No contacts yet</p>
+            <p className="text-[13px] text-[#888899] leading-relaxed mb-5 max-w-[220px] mx-auto">
+              Add someone you trust — they'll be alerted if you need help.
+            </p>
             <button
               onClick={openAdd}
-              className="mt-4 text-[13px] font-semibold text-[#534AB7]"
+              className="h-[46px] px-8 rounded-[14px] font-semibold text-[14px] text-white mx-auto flex items-center gap-2"
+              style={{ background: 'linear-gradient(135deg,#7F77DD,#534AB7)', boxShadow: '0 4px 16px rgba(83,74,183,0.30)' }}
             >
-              Add your first contact
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+              Add first contact
             </button>
           </div>
         ) : (
