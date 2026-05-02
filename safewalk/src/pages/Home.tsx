@@ -10,7 +10,7 @@ import { useGeolocation } from '../hooks/useGeolocation';
 import { useCheckIn } from '../hooks/useCheckIn';
 import { useNavigation } from '../hooks/useNavigation';
 import { getDirections } from '../services/directions';
-import { maneuverIcon, formatNavDistance, formatNavDuration, humanizeInstruction } from '../services/navigation';
+import { formatNavDistance, formatNavDuration, humanizeInstruction } from '../services/navigation';
 import { getNearbyPlaces } from '../services/safePlaces';
 import type { SafePlace } from '../services/safePlaces';
 import { MapView } from '../components/map/MapView';
@@ -30,7 +30,7 @@ interface Suggestion {
 const IDLE_PEEK   = 72;
 const IDLE_OPEN   = 192;
 const ACTIVE_MINI = 54;
-const ACTIVE_FULL = 272;
+const ACTIVE_FULL = 316;
 
 // ── Stats query ───────────────────────────────────────────────────────────────
 function useHomeStats(userId: string | undefined) {
@@ -70,6 +70,65 @@ function useSessionTimer(startedAt: Date | null) {
     return () => clearInterval(id);
   }, [startedAt]);
   return elapsed;
+}
+
+// ── Maneuver SVG icons (Google Maps-style directional arrows) ─────────────────
+function ManeuverSvg({ type, modifier }: { type: string; modifier?: string }) {
+  const props = { width: 28, height: 28, viewBox: '0 0 24 24', fill: 'none', stroke: 'white', strokeWidth: '2.5', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+
+  if (type === 'arrive') return (
+    <svg {...props}>
+      <path d="M12 2a7 7 0 0 1 7 7c0 4.9-7 13-7 13S5 13.9 5 9a7 7 0 0 1 7-7z"/>
+      <circle cx="12" cy="9" r="2.5" fill="white" stroke="none"/>
+    </svg>
+  );
+
+  if (type === 'roundabout' || type === 'rotary') return (
+    <svg {...props}>
+      <path d="M21.5 2v6h-6"/><path d="M21.34 15.57a10 10 0 1 1-.57-8.38"/>
+    </svg>
+  );
+
+  if (type === 'turn' || type === 'end of road') {
+    if (modifier === 'uturn') return (
+      <svg {...props}>
+        <path d="M9 14 4 9l5-5"/><path d="M4 9h9a4 4 0 0 1 0 8H5"/>
+      </svg>
+    );
+    if (modifier === 'sharp left' || modifier === 'left') return (
+      <svg {...props}>
+        <polyline points="9 14 4 9 9 4"/>
+        <path d="M20 20v-7a4 4 0 0 0-4-4H4"/>
+      </svg>
+    );
+    if (modifier === 'slight left') return (
+      <svg {...props}>
+        <path d="M5 19 12 5l7 14"/><path d="M12 5v14"/>
+        <path d="m8 11 4-6 4 6" strokeWidth="0"/>
+        <polyline points="8 15 5 19 11 19"/>
+      </svg>
+    );
+    if (modifier === 'sharp right' || modifier === 'right') return (
+      <svg {...props}>
+        <polyline points="15 14 20 9 15 4"/>
+        <path d="M4 20v-7a4 4 0 0 1 4-4h12"/>
+      </svg>
+    );
+    if (modifier === 'slight right') return (
+      <svg {...props}>
+        <polyline points="16 15 19 19 13 19"/>
+        <path d="M4 19 12 5l7 14"/>
+        <path d="M12 5v14"/>
+      </svg>
+    );
+  }
+
+  // straight / depart / continue / default
+  return (
+    <svg {...props}>
+      <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+    </svg>
+  );
 }
 
 // ── Logo badge ────────────────────────────────────────────────────────────────
@@ -773,69 +832,111 @@ export default function Home() {
           />
         </div>
 
-        {/* ── Active: top status bar ────────────────────────────────────── */}
+        {/* ── Active: unified navigation head ──────────────────────────── */}
         {isActive && (
           <div className="absolute top-0 left-0 right-0 z-20">
-            <div className="flex items-center justify-between px-4 py-2.5 bg-white/96 backdrop-blur-sm border-b border-[#E0E0E8]">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-[#3B6D11] animate-pulse" />
-                <span className="text-[13px] font-semibold text-[#1A1A28]">Walk in progress</span>
-              </div>
-              <span className="text-[13px] font-bold text-[#1A1A28] tabular-nums">{timer}</span>
-            </div>
 
-            {/* Direction banner */}
-            {isRerouting ? (
-              <div className="mx-3 mt-2 bg-[#E8A020] rounded-[14px] px-3.5 py-2.5 flex items-center gap-3 shadow-[0_2px_12px_rgba(0,0,0,0.12)]">
-                <div className="w-8 h-8 rounded-[8px] bg-white/20 flex items-center justify-center flex-shrink-0 text-[16px]">↻</div>
-                <div>
-                  <div className="text-white font-bold text-[14px]">Rerouting…</div>
-                  <div className="text-white/80 text-[12px]">Finding a new path for you</div>
+            {/* White nav head — status + direction as one block */}
+            <div className="bg-white" style={{ boxShadow: '0 2px 16px rgba(0,0,0,0.13)' }}>
+
+              {/* Slim status row */}
+              <div className="flex items-center justify-between px-4 pt-3 pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-[#3B6D11] animate-pulse flex-shrink-0" />
+                  <span className="text-[12px] font-semibold text-[#555566]">Walk active</span>
                 </div>
+                <span className="text-[13px] font-bold text-[#1A1A28] tabular-nums">{timer}</span>
               </div>
-            ) : isOffRoute ? (
-              <div className="mx-3 mt-2 bg-[#E24B4A] rounded-[14px] px-3.5 py-2.5 flex items-center gap-3 shadow-[0_2px_12px_rgba(0,0,0,0.12)]">
-                <div className="w-8 h-8 rounded-[8px] bg-white/20 flex items-center justify-center flex-shrink-0 text-[16px]">⚠</div>
-                <div>
-                  <div className="text-white font-bold text-[14px]">Off route</div>
-                  <div className="text-white/80 text-[12px]">Calculating a new route…</div>
-                </div>
-              </div>
-            ) : currentStep ? (
-              <>
-                <div className="mx-3 mt-2 bg-white rounded-[14px] px-3.5 py-2.5 flex items-center gap-3 shadow-[0_2px_10px_rgba(0,0,0,0.08)]">
-                  <div
-                    className="w-9 h-9 rounded-[10px] flex items-center justify-center flex-shrink-0 text-[18px] font-bold"
-                    style={{ background: '#534AB7', color: 'white' }}
-                  >
-                    {maneuverIcon(currentStep.maneuverType, currentStep.maneuverModifier)}
+
+              {/* Direction row */}
+              {isRerouting ? (
+                <div className="mx-3 mb-3 rounded-[14px] flex items-center overflow-hidden" style={{ background: '#E8A020' }}>
+                  <div className="w-[62px] self-stretch flex items-center justify-center flex-shrink-0">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21.5 2v6h-6"/><path d="M21.34 15.57a10 10 0 1 1-.57-8.38"/>
+                    </svg>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[14px] font-bold text-[#1A1A28] leading-snug">
+                  <div className="flex-1 py-3 pr-4">
+                    <div className="text-white font-bold text-[16px] leading-tight">Rerouting…</div>
+                    <div className="text-white/80 text-[12px] mt-0.5">Finding a new path for you</div>
+                  </div>
+                </div>
+              ) : isOffRoute ? (
+                <div className="mx-3 mb-3 rounded-[14px] flex items-center overflow-hidden" style={{ background: '#E24B4A' }}>
+                  <div className="w-[62px] self-stretch flex items-center justify-center flex-shrink-0">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>
+                      <path d="M12 9v4"/><path d="M12 17h.01"/>
+                    </svg>
+                  </div>
+                  <div className="flex-1 py-3 pr-4">
+                    <div className="text-white font-bold text-[16px] leading-tight">Off route</div>
+                    <div className="text-white/80 text-[12px] mt-0.5">Calculating a new route…</div>
+                  </div>
+                </div>
+              ) : currentStep ? (
+                <div className="mx-3 mb-3 rounded-[14px] flex items-stretch overflow-hidden border border-[#ECEAF8]" style={{ boxShadow: '0 1px 4px rgba(83,74,183,0.10)' }}>
+                  {/* Purple icon column */}
+                  <div className="flex items-center justify-center flex-shrink-0" style={{ width: 68, background: '#534AB7' }}>
+                    <ManeuverSvg type={currentStep.maneuverType} modifier={currentStep.maneuverModifier} />
+                  </div>
+
+                  {/* Instruction */}
+                  <div className="flex-1 min-w-0 px-3.5 py-3">
+                    <div className="text-[16px] font-bold text-[#1A1A28] leading-tight">
                       {humanizeInstruction(currentStep)}
                     </div>
                     {navSteps && navStepIndex < navSteps.length - 1 && navSteps[navStepIndex + 1] && (
-                      <div className="text-[12px] text-[#6F6F84] mt-0.5 leading-snug">
-                        then {humanizeInstruction(navSteps[navStepIndex + 1]).toLowerCase()}
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <div className="w-3.5 h-3.5 rounded-full bg-[#EEEDFE] flex items-center justify-center flex-shrink-0">
+                          <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="#534AB7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="m9 18 6-6-6-6"/>
+                          </svg>
+                        </div>
+                        <span className="text-[12px] text-[#888899] leading-tight truncate">
+                          {humanizeInstruction(navSteps[navStepIndex + 1])}
+                        </span>
                       </div>
                     )}
                   </div>
-                  {currentStep.distance > 30 && (
-                    <div className="flex-shrink-0 bg-[#EEEDFE] rounded-full px-2.5 py-1">
-                      <span className="text-[12px] font-bold text-[#534AB7]">{formatNavDistance(currentStep.distance)}</span>
-                    </div>
-                  )}
+
+                  {/* Distance — number + unit stacked */}
+                  {currentStep.distance > 30 && (() => {
+                    const raw = formatNavDistance(currentStep.distance);
+                    const sp  = raw.lastIndexOf(' ');
+                    const num  = sp !== -1 ? raw.slice(0, sp) : raw;
+                    const unit = sp !== -1 ? raw.slice(sp + 1) : '';
+                    return (
+                      <div className="flex flex-col items-center justify-center pr-4 pl-1 flex-shrink-0 min-w-[48px]">
+                        <span className="text-[20px] font-bold text-[#1A1A28] leading-none tabular-nums">{num}</span>
+                        {unit && <span className="text-[11px] text-[#888899] font-medium mt-0.5">{unit}</span>}
+                      </div>
+                    );
+                  })()}
                 </div>
-                {/* Safety status line */}
-                <div className="mx-4 mt-1.5 flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] text-[#6F6F84]">On route</span>
-                  <span className="text-[#D0D0DA]">·</span>
-                  <span className="text-[11px] text-[#6F6F84]">Check-in active</span>
-                  <span className="text-[#D0D0DA]">·</span>
-                  <span className="text-[11px] text-[#6F6F84]">Location sharing</span>
+              ) : (
+                /* No step yet — minimal "navigating" state */
+                <div className="mx-3 mb-3 rounded-[14px] bg-[#F6F6FA] border border-[#EEEEF4] px-4 py-3 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-[#EEEDFE] flex items-center justify-center flex-shrink-0">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#534AB7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+                    </svg>
+                  </div>
+                  <span className="text-[14px] font-semibold text-[#534AB7]">Calculating route…</span>
                 </div>
-              </>
-            ) : null}
+              )}
+            </div>
+
+            {/* Safety status line — on the map background */}
+            <div className="flex items-center gap-1.5 px-4 pt-1.5 pb-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#3B6D11] flex-shrink-0" />
+              <span className="text-[11px] text-white" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.40)' }}>On route</span>
+              <span className="text-white/60" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.30)' }}>·</span>
+              <span className="text-[11px] text-white" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.40)' }}>Check-in active</span>
+              <span className="text-white/60" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.30)' }}>·</span>
+              <span className="text-[11px] text-white" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.40)' }}>Location sharing</span>
+            </div>
+
           </div>
         )}
 
@@ -871,7 +972,7 @@ export default function Home() {
             transition: dragRef.current ? 'none' : 'height 0.28s cubic-bezier(0.4,0,0.2,1)',
           }}
         >
-          {/* Drag handle — works for both active and idle sheets */}
+          {/* Drag handle — wider and more visible when collapsed to signal expand-ability */}
           <div
             className="flex justify-center pt-2.5 pb-1 cursor-grab active:cursor-grabbing select-none"
             onPointerDown={handleDragStart}
@@ -879,7 +980,14 @@ export default function Home() {
             onPointerUp={handleDragEnd}
             onPointerCancel={handleDragCancel}
           >
-            <div className="w-10 h-1 bg-[#D5D5DD] rounded-full" />
+            <div
+              className="rounded-full transition-all duration-200"
+              style={{
+                width: (!isActive && !showIdleContent) ? 44 : 40,
+                height: 4,
+                background: (!isActive && !showIdleContent) ? '#C0C0CC' : '#D5D5DD',
+              }}
+            />
           </div>
 
           {/* ── Active walk: collapsed peek ──────────────────────────── */}
@@ -899,23 +1007,33 @@ export default function Home() {
           {/* ── Idle: peek row ───────────────────────────────────────── */}
           {!isActive && !showIdleContent && (
             <button
-              className="w-full flex items-center gap-2.5 px-4 py-1.5 text-left"
+              className="w-full flex items-center gap-2.5 px-4 py-1.5 text-left active:bg-[#F8F8FC]"
               onClick={() => setIdleOpen(true)}
+              aria-label="Expand destination panel"
             >
               {destSelected ? (
                 <>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#534AB7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
-                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
-                  </svg>
+                  <div className="w-7 h-7 rounded-full bg-[#EEEDFE] flex items-center justify-center flex-shrink-0">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#534AB7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
+                    </svg>
+                  </div>
                   <span className="flex-1 text-[14px] font-semibold text-[#1A1A28] truncate">{destinationText}</span>
-                  <span className="text-[12px] text-[#534AB7] font-semibold flex-shrink-0">Expand</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#534AB7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                    <path d="m18 15-6-6-6 6"/>
+                  </svg>
                 </>
               ) : (
                 <>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#888899" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
-                  </svg>
+                  <div className="w-7 h-7 rounded-full bg-[#F0F0F4] flex items-center justify-center flex-shrink-0">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#888899" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
+                    </svg>
+                  </div>
                   <span className="text-[14px] text-[#888899]">Where are you going?</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#BBBBCC" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 ml-auto">
+                    <path d="m18 15-6-6-6 6"/>
+                  </svg>
                 </>
               )}
             </button>
@@ -969,9 +1087,9 @@ export default function Home() {
                   { label: 'Remaining', value: navRemainingMeters > 0 ? formatNavDistance(navRemainingMeters) : `${(walk.distanceMeters / 1000).toFixed(1)} km` },
                   { label: 'ETA',       value: navRemainingSeconds > 0 ? formatNavDuration(navRemainingSeconds) : '—' },
                 ].map(({ label, value }, i) => (
-                  <div key={label} className={`flex-1 px-3 py-2.5 ${i > 0 ? 'border-l border-[#E4E4ED]' : ''}`}>
-                    <div className="text-[10px] text-[#999AAA] font-medium uppercase tracking-wide">{label}</div>
-                    <div className="text-[13px] font-bold text-[#1A1A28] tabular-nums mt-0.5">{value}</div>
+                  <div key={label} className={`flex-1 flex flex-col items-center justify-center px-2 py-3 ${i > 0 ? 'border-l border-[#E4E4ED]' : ''}`}>
+                    <div className="text-[11px] font-bold text-[#1A1A28] tabular-nums leading-none">{value}</div>
+                    <div className="text-[10px] text-[#999AAA] font-medium mt-1 leading-none">{label}</div>
                   </div>
                 ))}
               </div>
@@ -979,7 +1097,7 @@ export default function Home() {
               {/* Safe places toggle */}
               <button
                 onClick={handleToggleSafePlaces}
-                className="w-full h-8 rounded-[10px] text-[12px] font-semibold flex items-center justify-center gap-1.5 border"
+                className="w-full h-9 rounded-[10px] text-[12px] font-semibold flex items-center justify-center gap-1.5 border"
                 style={{
                   background:  showSafePlaces ? '#534AB7' : '#F6F6FA',
                   borderColor: showSafePlaces ? '#534AB7' : '#E0E0E8',
@@ -993,13 +1111,13 @@ export default function Home() {
               </button>
 
               {/* SOS + I feel uneasy + End walk */}
-              <div className="flex items-stretch gap-2.5">
+              <div className="flex items-center gap-2.5">
                 <SosButton onActivated={handleSOS} />
-                <div className="flex-1 flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1.5" style={{ flex: 1, height: 84 }}>
                   <button
                     onClick={() => setShowHelpMenu(true)}
-                    className="flex-1 rounded-[12px] text-[13px] font-semibold flex items-center justify-center gap-1.5 border"
-                    style={{ background: '#FFF8EC', borderColor: '#F5DFB0', color: '#7A5400', minHeight: 40 }}
+                    className="rounded-[12px] text-[13px] font-semibold flex items-center justify-center gap-1.5 border"
+                    style={{ background: '#FFF8EC', borderColor: '#F5DFB0', color: '#7A5400', flex: 1 }}
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>
@@ -1008,8 +1126,8 @@ export default function Home() {
                   </button>
                   <button
                     onClick={() => setShowEndConfirm(true)}
-                    className="flex-1 rounded-[12px] bg-[#F0F0F4] text-[#888899] border border-[#E0E0E8] font-medium text-[13px] flex items-center justify-center"
-                    style={{ minHeight: 36 }}
+                    className="rounded-[12px] bg-[#F0F0F4] text-[#888899] border border-[#E0E0E8] font-medium text-[13px] flex items-center justify-center"
+                    style={{ flex: 1 }}
                   >
                     End walk
                   </button>
@@ -1111,16 +1229,22 @@ export default function Home() {
 
               {/* Quick stats */}
               <div className="flex gap-2">
-                {[
-                  { label: 'Walks this month', value: stats.data?.walks ?? '—' },
-                  { label: 'Contacts',          value: stats.data?.contacts ?? '—' },
-                  { label: 'Status',            value: 'Safe', color: '#3B6D11' },
-                ].map(({ label, value, color }) => (
-                  <div key={label} className="flex-1 bg-[#F6F6FA] rounded-[12px] px-2.5 py-2">
-                    <div className="text-[10px] text-[#888899] font-medium">{label}</div>
-                    <div className="text-[16px] font-bold tracking-[-0.2px]" style={{ color: color ?? '#1A1A28' }}>{value}</div>
+                <div className="flex-1 bg-[#F6F6FA] rounded-[14px] py-3 flex flex-col items-center gap-0.5 border border-[#EEEEF4]">
+                  <span className="text-[20px] font-bold text-[#1A1A28] tabular-nums leading-none">{stats.data?.walks ?? '—'}</span>
+                  <span className="text-[10px] text-[#999AAA] font-medium text-center leading-tight">Walks<br/>this month</span>
+                </div>
+                <div className="flex-1 bg-[#F6F6FA] rounded-[14px] py-3 flex flex-col items-center gap-0.5 border border-[#EEEEF4]">
+                  <span className="text-[20px] font-bold text-[#1A1A28] tabular-nums leading-none">{stats.data?.contacts ?? '—'}</span>
+                  <span className="text-[10px] text-[#999AAA] font-medium text-center leading-tight">Trusted<br/>contacts</span>
+                </div>
+                <div className="flex-1 bg-[#F0FBF1] rounded-[14px] py-3 flex flex-col items-center gap-0.5 border border-[#D4EDDA]">
+                  <div className="w-5 h-5 rounded-full bg-[#3B6D11] flex items-center justify-center mb-0.5">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6 9 17l-5-5"/>
+                    </svg>
                   </div>
-                ))}
+                  <span className="text-[10px] text-[#3B6D11] font-semibold text-center leading-tight">You're<br/>safe</span>
+                </div>
               </div>
             </div>
           )}
