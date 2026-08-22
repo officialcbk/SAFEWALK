@@ -1,0 +1,85 @@
+// ─── Session-aware route guard ────────────────────────────────────────────────
+// RN port of the web app's ProtectedRoute: hydrates the session + profile into
+// authStore and subscribes to auth-state changes. Unlike the web version
+// (which only guards protected routes and relies on each screen to navigate
+// away on success), this gate is mounted once at the root and redirects both
+// directions — out of (app) when signed out, out of (auth)/onboarding when
+// signed in — so screens don't need their own post-auth navigation.
+
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useRouter, useSegments } from 'expo-router';
+import { supabase } from './supabase';
+import { useAuthStore } from '../store/authStore';
+import { FullPageSpinner } from '../components/ui/Spinner';
+import type { Profile } from '../types';
+
+async function loadProfile(userId: string, setProfile: (p: Profile | null) => void) {
+  const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+  setProfile(data as Profile | null);
+}
+
+export function AuthGate({ children }: { children: ReactNode }) {
+  const { session, loading, profile, setSession, setLoading, setProfile } = useAuthStore();
+  const [profileChecked, setProfileChecked] = useState(false);
+  const segments = useSegments();
+  const router = useRouter();
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    supabase.auth.getSession().then(async ({ data }) => {
+      setSession(data.session);
+      setLoading(false);
+      if (data.session) {
+        await loadProfile(data.session.user.id, setProfile);
+      }
+      if (mountedRef.current) setProfileChecked(true);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      setSession(newSession);
+      setLoading(false);
+      if (event === 'SIGNED_IN' && newSession) {
+        setProfileChecked(false);
+        await loadProfile(newSession.user.id, setProfile);
+        if (mountedRef.current) setProfileChecked(true);
+      } else if (event === 'SIGNED_OUT') {
+        setProfile(null);
+        setProfileChecked(true);
+      } else if (event === 'INITIAL_SESSION' && newSession && !useAuthStore.getState().profile) {
+        await loadProfile(newSession.user.id, setProfile);
+        if (mountedRef.current) setProfileChecked(true);
+      }
+    });
+
+    return () => {
+      mountedRef.current = false;
+      subscription.unsubscribe();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (loading || !profileChecked) return;
+
+    const path = segments.join('/');
+    const inAuthGroup = path.startsWith('(auth)');
+    const onOnboarding = path === '(app)/onboarding';
+
+    if (!session && !inAuthGroup) {
+      router.replace('/sign-in');
+      return;
+    }
+    if (session && profile && !profile.onboarding_completed && !onOnboarding) {
+      router.replace('/onboarding');
+      return;
+    }
+    if (session && inAuthGroup) {
+      router.replace(profile && !profile.onboarding_completed ? '/onboarding' : '/home');
+    }
+  }, [loading, profileChecked, session, profile, segments, router]);
+
+  if (loading || !profileChecked) return <FullPageSpinner />;
+
+  return <>{children}</>;
+}
