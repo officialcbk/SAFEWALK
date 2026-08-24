@@ -16,7 +16,12 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.safewalkmobile"
+      "package": "com.anonymous.safewalkmobile",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAGYbk5dnM33-wLYNwwy7aVWpIS9ILbxpI"
+        }
+      }
     },
     "web": {
       "bundler": "metro",

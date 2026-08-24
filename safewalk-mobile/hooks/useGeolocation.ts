@@ -48,6 +48,25 @@ export function useGeolocation(): UseGeolocationReturn {
         return;
       }
 
+      // Seed with the last cached fix immediately (near-instant) so the map
+      // centers on the user right away, Google-Maps-style, instead of
+      // sitting on the default region until the first live GPS fix — which
+      // can take several seconds — comes in from the watch below.
+      const cached = await Location.getLastKnownPositionAsync().catch(() => null);
+      if (cached) {
+        const { latitude, longitude, heading, speed } = cached.coords;
+        setState((prev) => ({
+          ...prev,
+          location: {
+            lat: latitude,
+            lng: longitude,
+            timestamp: new Date(cached.timestamp),
+            bearing: heading,
+            speed,
+          },
+        }));
+      }
+
       subscriptionRef.current = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,

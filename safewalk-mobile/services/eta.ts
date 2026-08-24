@@ -55,3 +55,16 @@ export function tickDistance(currentMetres: number): number {
   const covered = WALKING_SPEED_MPS * 10; // distance per 10 s interval
   return Math.max(0, currentMetres - covered);
 }
+
+/**
+ * Average pace as a "min/km" string, Strava-style.
+ * @example formatPace(1000, 600) → "10:00 /km"
+ * @example formatPace(0, 0)      → "—"
+ */
+export function formatPace(distanceMetres: number, durationSeconds: number): string {
+  if (distanceMetres <= 0 || durationSeconds <= 0) return '—';
+  const secPerKm = durationSeconds / (distanceMetres / 1000);
+  const min = Math.floor(secPerKm / 60);
+  const sec = Math.round(secPerKm % 60);
+  return `${min}:${String(sec).padStart(2, '0')} /km`;
+}
