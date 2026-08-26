@@ -80,7 +80,7 @@ export default function Settings() {
       supabase.from('walk_sessions').select('*').eq('user_id', user.id),
     ]);
     await Share.share({
-      title: 'SafeWalk data export',
+      title: 'Trayl data export',
       message: JSON.stringify({ profile: p, contacts: c, walks: w }, null, 2),
     });
   };
@@ -135,7 +135,7 @@ export default function Settings() {
               <Pressable
                 onPress={() => {
                   Share.share({
-                    message: 'Stay safe on your walks with SafeWalk — it alerts my contacts if I need help. Check it out!',
+                    message: 'Stay safe on your walks with Trayl — it alerts my contacts if I need help. Check it out!',
                   }).catch(() => {});
                 }}
                 className="h-9 px-3.5 bg-white rounded-xl items-center justify-center"
@@ -182,7 +182,7 @@ export default function Settings() {
         <SectionHeader label="Support" />
         <View className="bg-white border border-gray-border rounded-2xl overflow-hidden">
           <SettingRow
-            label="Rate SafeWalk"
+            label="Rate Trayl"
             sub="Leave a review on the App Store"
             right={<Star size={18} color="#F5A623" />}
             onPress={() => {}}
@@ -215,7 +215,7 @@ export default function Settings() {
           <SettingRow label="Privacy policy" onPress={() => {}} isLast />
         </View>
 
-        <Text className="text-center text-xs text-gray-text mt-6">SafeWalk v1.0.0 · PIPEDA compliant</Text>
+        <Text className="text-center text-xs text-gray-text mt-6">Trayl v1.0.0 · PIPEDA compliant</Text>
 
         <Pressable onPress={signOut} className="flex-row items-center justify-center gap-2 mt-3 py-3.5">
           <LogOut size={16} color="#A32D2D" />

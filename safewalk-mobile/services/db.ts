@@ -13,7 +13,7 @@ export async function ensureAnonymousAuth(): Promise<void> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
     const { error } = await supabase.auth.signInAnonymously();
-    if (error) console.warn("[SafeWalk] Anonymous sign-in failed:", error.message);
+    if (error) console.warn("[Trayl] Anonymous sign-in failed:", error.message);
   }
 }
 
@@ -26,7 +26,7 @@ export async function loadContactsDB(): Promise<TrustedContact[]> {
     .order("created_at", { ascending: true });
 
   if (error) {
-    console.warn("[SafeWalk] loadContactsDB:", error.message);
+    console.warn("[Trayl] loadContactsDB:", error.message);
     return [];
   }
   return (data ?? []).map((r) => ({
@@ -57,7 +57,7 @@ export async function insertContactDB(
     .single();
 
   if (error) {
-    console.warn("[SafeWalk] insertContactDB:", error.message);
+    console.warn("[Trayl] insertContactDB:", error.message);
     return null;
   }
   return { id: data.id, name: data.name, phone: data.phone, email: data.email, isPrimary: data.is_primary };
@@ -69,7 +69,7 @@ export async function updateContactDB(contact: TrustedContact): Promise<boolean>
     .update({ name: contact.name, phone: contact.phone, email: contact.email, is_primary: contact.isPrimary })
     .eq("id", contact.id);
 
-  if (error) { console.warn("[SafeWalk] updateContactDB:", error.message); return false; }
+  if (error) { console.warn("[Trayl] updateContactDB:", error.message); return false; }
   return true;
 }
 
@@ -78,13 +78,13 @@ export async function setPrimaryContactDB(id: string): Promise<boolean> {
     supabase.from("contacts").update({ is_primary: false }).neq("id", id),
     supabase.from("contacts").update({ is_primary: true }).eq("id", id),
   ]);
-  if (e1 || e2) { console.warn("[SafeWalk] setPrimaryContactDB:", e1?.message ?? e2?.message); return false; }
+  if (e1 || e2) { console.warn("[Trayl] setPrimaryContactDB:", e1?.message ?? e2?.message); return false; }
   return true;
 }
 
 export async function deleteContactDB(id: string): Promise<boolean> {
   const { error } = await supabase.from("contacts").delete().eq("id", id);
-  if (error) { console.warn("[SafeWalk] deleteContactDB:", error.message); return false; }
+  if (error) { console.warn("[Trayl] deleteContactDB:", error.message); return false; }
   return true;
 }
 
@@ -100,7 +100,7 @@ export async function createWalkSessionDB(destination: string | null): Promise<s
     .select("id")
     .single();
 
-  if (error) { console.warn("[SafeWalk] createWalkSessionDB:", error.message); return null; }
+  if (error) { console.warn("[Trayl] createWalkSessionDB:", error.message); return null; }
   return data.id;
 }
 
@@ -112,7 +112,7 @@ export async function endWalkSessionDB(
     .from("walk_sessions")
     .update({ ended_at: new Date().toISOString(), status })
     .eq("id", sessionId);
-  if (error) console.warn("[SafeWalk] endWalkSessionDB:", error.message);
+  if (error) console.warn("[Trayl] endWalkSessionDB:", error.message);
 }
 
 export async function updateWalkDestinationDB(sessionId: string, destination: string): Promise<void> {
@@ -120,7 +120,7 @@ export async function updateWalkDestinationDB(sessionId: string, destination: st
     .from("walk_sessions")
     .update({ destination })
     .eq("id", sessionId);
-  if (error) console.warn("[SafeWalk] updateWalkDestinationDB:", error.message);
+  if (error) console.warn("[Trayl] updateWalkDestinationDB:", error.message);
 }
 
 // ── Location Snapshots ────────────────────────────────────────────────────────
@@ -129,7 +129,7 @@ export async function pushLocationSnapshotDB(sessionId: string, loc: LocationDat
   const { error } = await supabase
     .from("location_snapshots")
     .insert({ session_id: sessionId, lat: loc.lat, lng: loc.lng, bearing: loc.bearing, speed: loc.speed });
-  if (error) console.warn("[SafeWalk] pushLocationSnapshotDB:", error.message);
+  if (error) console.warn("[Trayl] pushLocationSnapshotDB:", error.message);
 }
 
 // ── Share Sessions ────────────────────────────────────────────────────────────
@@ -165,7 +165,7 @@ export async function createShareSessionDB(
     last_updated_at: loc ? new Date().toISOString() : null,
     expires_at: new Date(Date.now() + 24 * 3_600_000).toISOString(),
   });
-  if (error) { console.warn("[SafeWalk] createShareSessionDB:", error.message); return false; }
+  if (error) { console.warn("[Trayl] createShareSessionDB:", error.message); return false; }
   return true;
 }
 
@@ -180,7 +180,7 @@ export async function updateShareSessionLocationDB(shareId: string, loc: Locatio
       last_updated_at: new Date().toISOString(),
     })
     .eq("id", shareId);
-  if (error) console.warn("[SafeWalk] updateShareSessionLocationDB:", error.message);
+  if (error) console.warn("[Trayl] updateShareSessionLocationDB:", error.message);
 }
 
 export async function getShareSessionDB(shareId: string): Promise<ShareSessionRow | null> {
@@ -189,7 +189,7 @@ export async function getShareSessionDB(shareId: string): Promise<ShareSessionRo
     .select("*")
     .eq("id", shareId)
     .single();
-  if (error) { console.warn("[SafeWalk] getShareSessionDB:", error.message); return null; }
+  if (error) { console.warn("[Trayl] getShareSessionDB:", error.message); return null; }
   return data;
 }
 

@@ -457,8 +457,8 @@ export default function Home() {
       const shareUrl = walk.shareToken ? buildShareUrl(walk.shareToken) : null;
       const name = profile?.full_name || user.email || 'Someone';
       const message = shareUrl
-        ? `EMERGENCY: ${name} has triggered an SOS on SafeWalk. Track their live location: ${shareUrl}`
-        : `EMERGENCY: ${name} has triggered an SOS on SafeWalk. Please check on them immediately.`;
+        ? `EMERGENCY: ${name} has triggered an SOS on Trayl. Track their live location: ${shareUrl}`
+        : `EMERGENCY: ${name} has triggered an SOS on Trayl. Please check on them immediately.`;
       await supabase.functions.invoke('send-alert', { body: { contacts: list, message } });
     } else {
       Toast.show({ type: 'error', text1: 'No trusted contacts', text2: 'Add contacts so they can be alerted.' });

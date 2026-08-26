@@ -20,7 +20,7 @@ export function DiscreetHelpMenu({
 }) {
   const handleShare = () => {
     if (!shareUrl) { Toast.show({ type: 'error', text1: 'No share link available yet.' }); return; }
-    Share.share({ title: 'Track my walk on SafeWalk', message: shareUrl }).catch(() => {});
+    Share.share({ title: 'Track my walk on Trayl', message: shareUrl }).catch(() => {});
   };
 
   return (

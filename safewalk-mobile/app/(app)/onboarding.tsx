@@ -100,7 +100,7 @@ export default function Onboarding() {
             Stay safe while you walk.
           </Text>
           <Text className="text-sm text-[#4A4A5A] text-center leading-relaxed">
-            SafeWalk monitors your journey and alerts your trusted contacts if something seems wrong.
+            Trayl monitors your journey and alerts your trusted contacts if something seems wrong.
           </Text>
           <View className="flex-1" />
           <Button fullWidth onPress={() => setStep(1)}>Next</Button>
@@ -216,7 +216,7 @@ function LocationStep({ onAllow, onSkip }: { onAllow: () => void; onSkip: () => 
           Allow location access.
         </Text>
         <Text className="text-sm text-[#4A4A5A] leading-relaxed mb-4">
-          SafeWalk needs your location only while a walk is active. We never track you in the background.
+          Trayl needs your location only while a walk is active. We never track you in the background.
         </Text>
 
         <View className="flex-row items-start gap-2.5 bg-purple-50 rounded-xl px-3.5 py-3 mb-5">

@@ -46,7 +46,7 @@ export async function sendAlert(payload: AlertPayload): Promise<void> {
   const message = buildSmsMessage(payload.userName, payload.location, payload.sessionUrl);
 
   // Always log for debugging
-  console.log("[SafeWalk] 🚨 SOS Alert", {
+  console.log("[Trayl] 🚨 SOS Alert", {
     triggeredAt: payload.triggeredAt.toISOString(),
     user: payload.userName,
     contacts: payload.contacts.map((c) => c.name).join(", "),
@@ -55,7 +55,7 @@ export async function sendAlert(payload: AlertPayload): Promise<void> {
   });
 
   if (!payload.contacts.length) {
-    console.warn("[SafeWalk] No contacts to alert.");
+    console.warn("[Trayl] No contacts to alert.");
     return;
   }
 
@@ -67,16 +67,16 @@ export async function sendAlert(payload: AlertPayload): Promise<void> {
   });
 
   if (error) {
-    console.warn("[SafeWalk] SMS delivery failed:", error.message);
+    console.warn("[Trayl] SMS delivery failed:", error.message);
     return;
   }
 
-  console.log(`[SafeWalk] SMS — sent: ${data.sent}, failed: ${data.failed}`);
+  console.log(`[Trayl] SMS — sent: ${data.sent}, failed: ${data.failed}`);
   if (data.failed > 0) {
     data.results
       .filter((r: { success: boolean; name: string; error?: string }) => !r.success)
       .forEach((r: { name: string; error?: string }) =>
-        console.warn(`[SafeWalk] Failed to SMS ${r.name}:`, r.error)
+        console.warn(`[Trayl] Failed to SMS ${r.name}:`, r.error)
       );
   }
 }

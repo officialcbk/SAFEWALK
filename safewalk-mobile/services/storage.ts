@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { LocationData } from '../types/walk';
 import type { TrustedContact } from '../types/contact';
 
-/** All SafeWalk storage keys in one place – prevents key drift. */
+/** All Trayl storage keys in one place – prevents key drift. */
 const KEYS = {
   LAST_KNOWN_LOCATION: 'sw:last_known_location',
   CONTACTS: 'sw:contacts',
@@ -20,7 +20,7 @@ export async function saveLastKnownLocation(loc: LocationData): Promise<void> {
   try {
     await AsyncStorage.setItem(KEYS.LAST_KNOWN_LOCATION, JSON.stringify(loc));
   } catch {
-    console.warn('[SafeWalk] Could not save last known location.');
+    console.warn('[Trayl] Could not save last known location.');
   }
 }
 
@@ -58,7 +58,7 @@ export async function saveContacts(contacts: TrustedContact[]): Promise<void> {
   try {
     await AsyncStorage.setItem(KEYS.CONTACTS, JSON.stringify(contacts));
   } catch {
-    console.warn('[SafeWalk] Could not save contacts.');
+    console.warn('[Trayl] Could not save contacts.');
   }
 }
 
@@ -76,12 +76,12 @@ export async function markPermissionSeen(): Promise<void> {
 
 // ── Delete All / Export ───────────────────────────────────────────────────────
 
-/** Wipe every SafeWalk key from storage. */
+/** Wipe every Trayl key from storage. */
 export async function deleteAllData(): Promise<void> {
   await AsyncStorage.multiRemove(Object.values(KEYS));
 }
 
-/** Serialize all stored SafeWalk data to a pretty-printed JSON string. */
+/** Serialize all stored Trayl data to a pretty-printed JSON string. */
 export async function exportAllData(): Promise<string> {
   const snapshot: Record<string, unknown> = {};
   for (const [label, key] of Object.entries(KEYS)) {

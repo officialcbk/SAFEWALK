@@ -2,7 +2,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text, View } from 'react-native';
 
-/** Gradient badge with the SafeWalk concentric-ring pin mark. */
+/** Gradient badge with the Trayl concentric-ring pin mark. */
 export function LogoBadge({ size = 40 }: { size?: number }) {
   const iconSize = Math.round(size * 0.8);
   return (
@@ -27,7 +27,7 @@ export function LogoBadge({ size = 40 }: { size?: number }) {
   );
 }
 
-/** Pill-shaped "SafeWalk" wordmark used at the top of the sign-in screen. */
+/** Pill-shaped "Trayl" wordmark used at the top of the sign-in screen. */
 export function LogoMark() {
   return (
     <View
@@ -35,7 +35,7 @@ export function LogoMark() {
       style={{ shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
     >
       <LogoBadge size={28} />
-      <Text className="font-bold text-sm text-dark-text">SafeWalk</Text>
+      <Text className="font-bold text-sm text-dark-text">Trayl</Text>
     </View>
   );
 }
