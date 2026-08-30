@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useWalkStore } from '../store/walkStore';
 
-const CHECKIN_SECONDS = 90;
-
 export function useCheckIn(isActive: boolean, onExpired: () => void) {
-  const { checkInSecondsLeft, setCheckInTimer } = useWalkStore();
+  const { checkInSecondsLeft, checkInIntervalSeconds, setCheckInTimer } = useWalkStore();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onExpiredRef = useRef(onExpired);
   useEffect(() => {
@@ -12,8 +10,8 @@ export function useCheckIn(isActive: boolean, onExpired: () => void) {
   }, [onExpired]);
 
   const reset = useCallback(() => {
-    setCheckInTimer(CHECKIN_SECONDS);
-  }, [setCheckInTimer]);
+    setCheckInTimer(checkInIntervalSeconds);
+  }, [setCheckInTimer, checkInIntervalSeconds]);
 
   useEffect(() => {
     if (!isActive) {
@@ -26,7 +24,7 @@ export function useCheckIn(isActive: boolean, onExpired: () => void) {
         const next = s.checkInSecondsLeft - 1;
         if (next <= 0) {
           onExpiredRef.current();
-          return { checkInSecondsLeft: CHECKIN_SECONDS };
+          return { checkInSecondsLeft: s.checkInIntervalSeconds };
         }
         return { checkInSecondsLeft: next };
       });

@@ -1,14 +1,14 @@
 // Google Maps-style directional arrow icons for the active turn-by-turn step
 import Svg, { Circle, Path, Polyline } from 'react-native-svg';
 
-export function ManeuverIcon({ type, modifier }: { type: string; modifier?: string }) {
-  const props = { width: 28, height: 28, viewBox: '0 0 24 24', fill: 'none', stroke: 'white', strokeWidth: 2.5, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+export function ManeuverIcon({ type, modifier, color = 'white', size = 28 }: { type: string; modifier?: string; color?: string; size?: number }) {
+  const props = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 2.5, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
 
   if (type === 'arrive') {
     return (
       <Svg {...props}>
         <Path d="M12 2a7 7 0 0 1 7 7c0 4.9-7 13-7 13S5 13.9 5 9a7 7 0 0 1 7-7z" />
-        <Circle cx={12} cy={9} r={2.5} fill="white" stroke="none" />
+        <Circle cx={12} cy={9} r={2.5} fill={color} stroke="none" />
       </Svg>
     );
   }

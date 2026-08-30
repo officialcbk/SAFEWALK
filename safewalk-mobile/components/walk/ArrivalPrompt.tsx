@@ -1,45 +1,49 @@
 import { Pressable, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Path } from 'react-native-svg';
 
+// The "Arrived" state's bottom-sheet content — rendered in place of the
+// normal ETA/SOS row once the walker reaches the destination. Time, distance
+// and check-ins are all real counted numbers, never estimates.
 export function ArrivalPrompt({
   destination,
-  bottomOffset,
+  timeLabel,
+  distanceLabel,
+  checkIns,
   onEnd,
-  onDismiss,
 }: {
   destination: string | null;
-  bottomOffset: number;
+  timeLabel: string;
+  distanceLabel: string;
+  checkIns: number;
   onEnd: () => void;
-  onDismiss: () => void;
 }) {
   return (
-    <View className="absolute left-0 right-0 px-4" style={{ bottom: bottomOffset, zIndex: 20 }}>
-      <View
-        className="bg-white rounded-[18px] p-4"
-        style={{ shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 20, shadowOffset: { width: 0, height: -4 }, elevation: 8 }}
-      >
-        <View className="flex-row items-center gap-3 mb-3">
-          <View className="w-10 h-10 rounded-full items-center justify-center" style={{ backgroundColor: '#E8F5E9' }}>
-            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#2E7D32" strokeWidth={2.5}>
-              <Path d="M20 6 9 17l-5-5" />
-            </Svg>
+    <View>
+      <Text style={{ fontFamily: 'IBMPlexMono_500Medium', fontSize: 8.5, letterSpacing: 1.02, textTransform: 'uppercase', color: 'rgba(0,0,0,.42)' }}>
+        You&apos;ve arrived
+      </Text>
+      <Text style={{ fontFamily: 'Archivo_700Bold', fontSize: 21, color: '#0A0A0A', marginTop: 4, letterSpacing: -0.3 }} numberOfLines={1}>
+        {destination ?? 'Your destination'}
+      </Text>
+
+      <View style={{ flexDirection: 'row', marginTop: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(0,0,0,.1)' }}>
+        {[
+          { l: 'Time', v: timeLabel },
+          { l: 'Distance', v: distanceLabel },
+          { l: 'Check-in', v: String(checkIns) },
+        ].map(({ l, v }, i) => (
+          <View key={l} style={{ flex: 1, paddingVertical: 12, paddingLeft: i > 0 ? 14 : 0, borderLeftWidth: i > 0 ? 1 : 0, borderLeftColor: 'rgba(0,0,0,.1)' }}>
+            <Text style={{ fontFamily: 'IBMPlexMono_500Medium', fontSize: 8, letterSpacing: 0.9, textTransform: 'uppercase', color: 'rgba(0,0,0,.42)' }}>{l}</Text>
+            <Text style={{ fontFamily: 'Archivo_700Bold', fontSize: 20, color: '#0A0A0A', marginTop: 5 }}>{v}</Text>
           </View>
-          <View className="flex-1 min-w-0">
-            <Text className="text-[15px] font-bold text-dark-text">You&apos;ve nearly arrived!</Text>
-            {destination && <Text className="text-xs text-gray-text" numberOfLines={1}>{destination}</Text>}
-          </View>
-        </View>
-        <View className="flex-row gap-2">
-          <Pressable onPress={onDismiss} className="flex-1 h-10 rounded-xl bg-gray-bg items-center justify-center">
-            <Text className="text-[13px] font-semibold text-gray-text">Keep walking</Text>
-          </Pressable>
-          <Pressable onPress={onEnd} className="flex-1 h-10 rounded-xl overflow-hidden items-center justify-center">
-            <LinearGradient colors={['#7F77DD', '#534AB7']} style={{ position: 'absolute', inset: 0 }} />
-            <Text className="text-[13px] font-semibold text-white">End walk</Text>
-          </Pressable>
-        </View>
+        ))}
       </View>
+
+      <Pressable
+        onPress={onEnd}
+        style={{ height: 56, borderRadius: 14, backgroundColor: '#0A0A0A', alignItems: 'center', justifyContent: 'center', marginTop: 16 }}
+      >
+        <Text style={{ fontFamily: 'Archivo_700Bold', fontSize: 15.5, color: '#fff' }}>I&apos;m here, end walk</Text>
+      </Pressable>
     </View>
   );
 }

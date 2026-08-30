@@ -21,12 +21,16 @@ export function ConfirmDialog({
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
       <Text className="text-[13px] text-gray-text leading-relaxed mb-5">{body}</Text>
       <View className="flex-row gap-2.5">
-        <Button variant="ghost" fullWidth onPress={onClose} disabled={loading}>
-          Cancel
-        </Button>
-        <Button variant={confirmVariant} fullWidth onPress={onConfirm} loading={loading}>
-          {confirmLabel}
-        </Button>
+        <View className="flex-1">
+          <Button variant="ghost" fullWidth onPress={onClose} disabled={loading}>
+            Cancel
+          </Button>
+        </View>
+        <View className="flex-1">
+          <Button variant={confirmVariant} fullWidth onPress={onConfirm} loading={loading}>
+            {confirmLabel}
+          </Button>
+        </View>
       </View>
     </Modal>
   );

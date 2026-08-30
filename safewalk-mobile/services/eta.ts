@@ -68,3 +68,12 @@ export function formatPace(distanceMetres: number, durationSeconds: number): str
   const sec = Math.round(secPerKm % 60);
   return `${min}:${String(sec).padStart(2, '0')} /km`;
 }
+
+/** Wall-clock arrival time, `secondsFromNow` in the future — e.g. "6:42 PM". */
+export function formatArrivalClock(secondsFromNow: number): string {
+  const d = new Date(Date.now() + secondsFromNow * 1000);
+  let h = d.getHours();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${String(d.getMinutes()).padStart(2, '0')} ${ampm}`;
+}

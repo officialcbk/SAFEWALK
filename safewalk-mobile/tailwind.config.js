@@ -5,6 +5,18 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Trayl rebrand tokens (see design handoff). Old purple/status/sos/
+        // dark/gray tokens below are kept until every screen using them has
+        // been migrated â remove once the rebrand covers the whole app.
+        ink: '#0A0A0A',
+        alert: '#E5342A',
+        fill: '#F1F0ED',
+        chip: '#EFEEEB',
+        map: {
+          base: '#E9E7E2',
+          road: '#FFFFFF',
+          block: '#DEDBD4',
+        },
         purple: {
           50: '#EEEDFE',
           100: '#CECBF6',
@@ -34,7 +46,17 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans: ['Inter_400Regular', 'System'],
+        // React Native has no font-weight synthesis for custom fonts â each
+        // weight is its own named face, so weights are separate font-family
+        // utilities rather than Tailwind's font-bold/font-semibold (those
+        // only ever apply to System and would no-op here).
+        sans: ['Archivo_400Regular', 'System'],
+        'sans-medium': ['Archivo_500Medium', 'System'],
+        'sans-semibold': ['Archivo_600SemiBold', 'System'],
+        'sans-bold': ['Archivo_700Bold', 'System'],
+        'sans-extrabold': ['Archivo_800ExtraBold', 'System'],
+        mono: ['IBMPlexMono_400Regular', 'System'],
+        'mono-medium': ['IBMPlexMono_500Medium', 'System'],
       },
       borderRadius: {
         sm: '6px',

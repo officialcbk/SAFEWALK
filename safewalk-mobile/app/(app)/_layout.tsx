@@ -1,11 +1,9 @@
 import { Tabs, useSegments } from 'expo-router';
-import { Home, Users, History, Settings } from 'lucide-react-native';
 import { useWalkStore } from '../../store/walkStore';
+import { TrailTabBar } from '../../components/nav/TrailTabBar';
 
-const ACTIVE = '#534AB7';
-const MUTED = '#888899';
 // Full-screen routes with no tab chrome — same treatment as an active walk.
-const CHROMELESS_ROUTES = new Set(['walk-confirm', 'walk-summary']);
+const CHROMELESS_ROUTES = new Set(['walk-confirm', 'walk-summary', 'search', 'walk-detail', 'profile']);
 
 export default function AppTabsLayout() {
   const isWalking = useWalkStore((s) => !!s.walk.sessionId);
@@ -15,35 +13,19 @@ export default function AppTabsLayout() {
 
   return (
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: ACTIVE,
-        tabBarInactiveTintColor: MUTED,
-        tabBarStyle: hideTabBar
-          ? { display: 'none' }
-          : { height: 78, paddingTop: 8, paddingBottom: 22, borderTopColor: '#E0E0E8' },
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
-      }}
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => (hideTabBar ? null : <TrailTabBar {...props} />)}
     >
-      <Tabs.Screen
-        name="home"
-        options={{ title: 'Home', tabBarIcon: ({ color }) => <Home size={22} color={color} /> }}
-      />
-      <Tabs.Screen
-        name="contacts"
-        options={{ title: 'Contacts', tabBarIcon: ({ color }) => <Users size={22} color={color} /> }}
-      />
-      <Tabs.Screen
-        name="history"
-        options={{ title: 'History', tabBarIcon: ({ color }) => <History size={22} color={color} /> }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{ title: 'Settings', tabBarIcon: ({ color }) => <Settings size={22} color={color} /> }}
-      />
+      <Tabs.Screen name="home" options={{ title: 'Home' }} />
+      <Tabs.Screen name="contacts" options={{ title: 'Contacts' }} />
+      <Tabs.Screen name="history" options={{ title: 'History' }} />
+      <Tabs.Screen name="settings" options={{ title: 'Account' }} />
       <Tabs.Screen name="onboarding" options={{ href: null, headerShown: false }} />
       <Tabs.Screen name="walk-confirm" options={{ href: null, headerShown: false }} />
       <Tabs.Screen name="walk-summary" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="search" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="walk-detail" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="profile" options={{ href: null, headerShown: false }} />
     </Tabs>
   );
 }

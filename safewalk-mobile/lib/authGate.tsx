@@ -41,19 +41,24 @@ export function AuthGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
 
+    console.log('PERF_TRACE authgate-effect-start', Date.now());
     supabase.auth.getSession().then(async ({ data }) => {
+      console.log('PERF_TRACE getSession-resolved', Date.now());
       setSession(data.session);
       setLoading(false);
       if (data.session) {
         await waitForAuthStoreHydration();
+        console.log('PERF_TRACE hydration-done', Date.now());
         const cached = useAuthStore.getState().profile;
         if (cached && cached.id === data.session.user.id) {
           // Show the cached profile immediately instead of blocking on a
           // network round-trip; refresh it quietly in the background.
           if (mountedRef.current) setProfileChecked(true);
+          console.log('PERF_TRACE profileChecked-cached', Date.now());
           loadProfile(data.session.user.id, setProfile);
         } else {
           await loadProfile(data.session.user.id, setProfile);
+          console.log('PERF_TRACE profileChecked-network', Date.now());
           if (mountedRef.current) setProfileChecked(true);
         }
       } else {

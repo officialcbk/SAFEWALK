@@ -1,49 +1,57 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, Share, Text, TextInput, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { ChevronRight, Download, Gift, LogOut, Star } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { useWalkStore } from '../../store/walkStore';
-import { Avatar } from '../../components/ui/Avatar';
 import { Toggle } from '../../components/ui/Toggle';
 import { Modal } from '../../components/ui/Modal';
 
-function SectionHeader({ label }: { label: string }) {
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '?';
+}
+
+function StatStrip({ items }: { items: { label: string; value: string }[] }) {
   return (
-    <Text className="text-[13px] font-semibold text-gray-text uppercase tracking-wide pt-4 pb-2">
-      {label}
+    <View style={{ flexDirection: 'row', marginTop: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(0,0,0,.1)' }}>
+      {items.map(({ label, value }, i) => (
+        <View key={label} style={{ flex: 1, paddingVertical: 14, paddingLeft: i > 0 ? 16 : 0, borderLeftWidth: i > 0 ? 1 : 0, borderLeftColor: 'rgba(0,0,0,.1)' }}>
+          <Text style={{ fontFamily: 'IBMPlexMono_500Medium', fontSize: 8.5, letterSpacing: 1.02, textTransform: 'uppercase', color: 'rgba(0,0,0,.42)' }}>{label}</Text>
+          <Text style={{ fontFamily: 'Archivo_700Bold', fontSize: 19, letterSpacing: -0.57, color: '#0A0A0A', marginTop: 9 }}>{value}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function Eyebrow({ children }: { children: string }) {
+  return (
+    <Text style={{ fontFamily: 'IBMPlexMono_500Medium', fontSize: 9.5, letterSpacing: 1.33, textTransform: 'uppercase', color: 'rgba(0,0,0,.42)', paddingBottom: 4 }}>
+      {children}
     </Text>
   );
 }
 
-function SettingRow({
-  label, sub, right, onPress, danger, isLast,
-}: {
-  label: string;
-  sub?: string;
-  right?: ReactNode;
-  onPress?: () => void;
-  danger?: boolean;
-  isLast?: boolean;
-}) {
-  const El = onPress ? Pressable : View;
+function AccountTile({ name, sub, isFirst, onPress }: { name: string; sub: string; isFirst?: boolean; onPress: () => void }) {
   return (
-    <El
+    <Pressable
       onPress={onPress}
-      className={`flex-row items-center w-full px-4 py-3.5 gap-3 min-h-[52px] ${isLast ? '' : 'border-b border-gray-border'}`}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderTopWidth: isFirst ? 0 : 1, borderTopColor: 'rgba(0,0,0,.09)' }}
     >
-      <View className="flex-1 min-w-0">
-        <Text className={`text-sm font-semibold ${danger ? 'text-status-danger' : 'text-dark-text'}`}>{label}</Text>
-        {sub && <Text className="text-xs text-gray-text mt-0.5">{sub}</Text>}
+      <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#F1F0ED' }} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontFamily: 'Archivo_600SemiBold', fontSize: 14.5, letterSpacing: -0.22, color: '#0A0A0A' }}>{name}</Text>
+        <Text style={{ fontFamily: 'Archivo_400Regular', fontSize: 11.5, color: 'rgba(0,0,0,.5)', marginTop: 6 }} numberOfLines={1}>{sub}</Text>
       </View>
-      {right ?? (onPress && <ChevronRight size={18} color="#888899" />)}
-    </El>
+      <View style={{ width: 8, height: 8, borderTopWidth: 2, borderRightWidth: 2, borderColor: 'rgba(0,0,0,.3)', transform: [{ rotate: '45deg' }] }} />
+    </Pressable>
   );
 }
+
+const comingSoon = () => Toast.show({ type: 'info', text1: "Not built yet — coming soon." });
 
 export default function Settings() {
   const { user, profile, clear } = useAuthStore();
@@ -51,6 +59,8 @@ export default function Settings() {
   const router = useRouter();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
+  const [showNotifModal, setShowNotifModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [prefs, setPrefs] = useState({ checkin_reminders: true, walk_summary: true, auto_delete: true });
 
   const { data: profileData } = useQuery({
@@ -62,8 +72,21 @@ export default function Settings() {
     },
   });
 
+  const { data: stats } = useQuery({
+    queryKey: ['account-stats', user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const [{ data: walks }, { count: contacts }] = await Promise.all([
+        supabase.from('walk_sessions').select('distance_meters').eq('user_id', user!.id),
+        supabase.from('trusted_contacts').select('id', { count: 'exact', head: true }).eq('user_id', user!.id),
+      ]);
+      const distanceM = (walks ?? []).reduce((sum, w) => sum + (w.distance_meters ?? 0), 0);
+      return { walkCount: walks?.length ?? 0, distanceKm: distanceM / 1000, contacts: contacts ?? 0 };
+    },
+  });
+
   const displayName = profileData?.full_name ?? profile?.full_name ?? user?.email ?? 'User';
-  const initials = displayName.slice(0, 2).toUpperCase();
+  const phone = profileData?.phone ?? profile?.phone ?? '';
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -100,128 +123,134 @@ export default function Settings() {
     Toast.show({ type: 'success', text1: 'All data deleted. Account removed.' });
   };
 
+  const accountTiles = [
+    { name: 'Settings', sub: 'Units, map, appearance', onPress: comingSoon },
+    { name: 'Notifications', sub: 'Check-ins, arrivals', onPress: () => setShowNotifModal(true) },
+    { name: 'Safety', sub: 'SOS, escalation, check-in timing', onPress: comingSoon },
+    { name: 'Emergency info', sub: 'Shared with responders only', onPress: comingSoon },
+    { name: 'Places', sub: 'Home, Work, 4 saved', onPress: comingSoon },
+    { name: 'Privacy', sub: 'Who can see your live route', onPress: () => setShowPrivacyModal(true) },
+  ];
+
+  const supportTiles = [
+    {
+      name: 'Refer friends', sub: 'Invite a walker, both get 1 month',
+      onPress: () => Share.share({ message: 'Stay safe on your walks with Trayl — it alerts my contacts if I need help. Check it out!' }).catch(() => {}),
+    },
+    { name: 'Help', sub: 'Guides and contact', onPress: comingSoon },
+    { name: 'Legal', sub: 'Terms, privacy, licences', onPress: comingSoon },
+    { name: 'Sign out', sub: displayName, onPress: signOut },
+  ];
+
   return (
-    <View className="flex-1 bg-gray-bg">
-      <View className="px-5 pt-3 pb-3">
-        <Text className="text-[26px] font-bold text-dark-text tracking-tight">Settings</Text>
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      <View style={{ paddingTop: 66, paddingHorizontal: 20 }}>
+        <Text style={{ fontFamily: 'Archivo_800ExtraBold', fontSize: 28, letterSpacing: -1.12, color: '#0A0A0A' }}>Account</Text>
+
+        <Pressable
+          onPress={() => router.push('/profile')}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 22, padding: 16, borderWidth: 1, borderColor: 'rgba(0,0,0,.12)', borderRadius: 16 }}
+        >
+          <View style={{ width: 48, height: 48, borderRadius: 99, backgroundColor: '#0A0A0A', alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontFamily: 'Archivo_600SemiBold', fontSize: 15, color: '#fff' }}>{initialsOf(displayName)}</Text>
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontFamily: 'Archivo_700Bold', fontSize: 16.5, letterSpacing: -0.33, color: '#0A0A0A' }} numberOfLines={1}>{displayName}</Text>
+            <Text style={{ fontFamily: 'IBMPlexMono_500Medium', fontSize: 11, color: 'rgba(0,0,0,.5)', marginTop: 8 }} numberOfLines={1}>{phone || user?.email}</Text>
+          </View>
+          <View style={{ width: 8, height: 8, borderTopWidth: 2, borderRightWidth: 2, borderColor: 'rgba(0,0,0,.3)', transform: [{ rotate: '45deg' }] }} />
+        </Pressable>
+
+        <StatStrip items={[
+          { label: 'Walks', value: String(stats?.walkCount ?? '—') },
+          { label: 'Distance', value: stats ? `${stats.distanceKm.toFixed(0)} km` : '—' },
+          { label: 'Watchers', value: String(stats?.contacts ?? '—') },
+        ]} />
       </View>
 
-      <ScrollView className="px-4" contentContainerStyle={{ paddingBottom: 32 }}>
-        {/* Profile card */}
-        <View className="bg-white border border-gray-border rounded-2xl p-4 flex-row items-center gap-3.5 mb-2">
-          <Avatar initials={initials} size={56} />
-          <View className="flex-1 min-w-0">
-            <Text className="text-base font-bold text-dark-text" numberOfLines={1}>{displayName}</Text>
-            <Text className="text-xs text-gray-text" numberOfLines={1}>{user?.email}</Text>
-          </View>
-          <Pressable className="h-9 px-3.5 bg-purple-50 border border-purple-100 rounded-2xl items-center justify-center">
-            <Text className="text-purple-600 text-[13px] font-semibold">Edit</Text>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 18 }}>
+        <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 18 }}>
+          <Pressable onPress={() => router.push('/contacts')} style={{ flex: 1, borderWidth: 1, borderColor: 'rgba(0,0,0,.12)', borderRadius: 12, padding: 13 }}>
+            <Text style={{ fontFamily: 'Archivo_600SemiBold', fontSize: 12.5, color: '#0A0A0A' }}>Add a contact</Text>
+            <Text style={{ fontFamily: 'Archivo_400Regular', fontSize: 11, color: 'rgba(0,0,0,.5)', marginTop: 6 }}>
+              {stats?.contacts ?? 0} on standby
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => Toast.show({ type: 'info', text1: 'SOS test complete.', text2: 'No alert was actually sent.' })}
+            style={{ flex: 1, borderWidth: 1, borderColor: 'rgba(0,0,0,.12)', borderRadius: 12, padding: 13 }}
+          >
+            <Text style={{ fontFamily: 'Archivo_600SemiBold', fontSize: 12.5, color: '#0A0A0A' }}>Test SOS</Text>
+            <Text style={{ fontFamily: 'Archivo_400Regular', fontSize: 11, color: 'rgba(0,0,0,.5)', marginTop: 6 }}>No alert sent</Text>
           </Pressable>
         </View>
 
-        {/* Refer a friend */}
-        <View className="rounded-2xl mb-2 overflow-hidden">
-          <LinearGradient colors={['#534AB7', '#7F77DD']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-            <View className="p-4 flex-row items-center gap-3.5">
-              <View className="w-12 h-12 rounded-2xl bg-white/15 items-center justify-center">
-                <Gift size={24} color="white" />
-              </View>
-              <View className="flex-1 min-w-0">
-                <Text className="text-[15px] font-bold text-white leading-tight">Refer a friend</Text>
-                <Text className="text-xs text-white/80 mt-0.5 leading-tight">
-                  Invite someone you walk with to stay safe
-                </Text>
-              </View>
-              <Pressable
-                onPress={() => {
-                  Share.share({
-                    message: 'Stay safe on your walks with Trayl — it alerts my contacts if I need help. Check it out!',
-                  }).catch(() => {});
-                }}
-                className="h-9 px-3.5 bg-white rounded-xl items-center justify-center"
-              >
-                <Text className="text-purple-600 text-[13px] font-bold">Share</Text>
-              </Pressable>
-            </View>
-          </LinearGradient>
+        <Eyebrow>Your account</Eyebrow>
+        <View>
+          {accountTiles.map((t, i) => <AccountTile key={t.name} {...t} isFirst={i === 0} />)}
         </View>
 
-        {/* Notifications */}
-        <SectionHeader label="Notifications" />
-        <View className="bg-white border border-gray-border rounded-2xl overflow-hidden">
-          <SettingRow
-            label="Check-in reminders"
-            sub="In-app countdown during walks"
-            right={<Toggle on={prefs.checkin_reminders} onChange={(v) => setPrefs((p) => ({ ...p, checkin_reminders: v }))} />}
-          />
-          <SettingRow
-            label="Walk summary"
-            sub="Toast when a walk ends"
-            right={<Toggle on={prefs.walk_summary} onChange={(v) => setPrefs((p) => ({ ...p, walk_summary: v }))} />}
-            isLast
-          />
+        <View style={{ paddingTop: 22 }}>
+          <Eyebrow>Support</Eyebrow>
+        </View>
+        <View>
+          {supportTiles.map((t, i) => <AccountTile key={t.name} {...t} isFirst={i === 0} />)}
         </View>
 
-        {/* Privacy */}
-        <SectionHeader label="Privacy" />
-        <View className="bg-white border border-gray-border rounded-2xl overflow-hidden">
-          <SettingRow
-            label="Location only during walks"
-            sub="Background tracking is never used"
-            right={<Toggle on={true} onChange={() => {}} />}
-          />
-          <SettingRow
-            label="Auto-delete after 30 days"
-            sub="Walks & location data"
-            right={<Toggle on={prefs.auto_delete} onChange={(v) => setPrefs((p) => ({ ...p, auto_delete: v }))} />}
-            isLast
-          />
+        <View style={{ paddingTop: 22 }}>
+          <Eyebrow>Your data</Eyebrow>
+        </View>
+        <View>
+          <AccountTile name="Export my data" sub="Download everything we have on you" isFirst onPress={exportData} />
+          <AccountTile name="Delete all my data" sub="Permanently removes your account" onPress={() => setShowDeleteConfirm(true)} />
         </View>
 
-        {/* Support */}
-        <SectionHeader label="Support" />
-        <View className="bg-white border border-gray-border rounded-2xl overflow-hidden">
-          <SettingRow
-            label="Rate Trayl"
-            sub="Leave a review on the App Store"
-            right={<Star size={18} color="#F5A623" />}
-            onPress={() => {}}
-          />
-          <SettingRow label="Help & FAQ" sub="Common questions answered" onPress={() => {}} />
-          <SettingRow label="Report a problem" sub="Something not working? Tell us" onPress={() => {}} isLast />
-        </View>
-
-        {/* Data */}
-        <SectionHeader label="Your data" />
-        <View className="bg-white border border-gray-border rounded-2xl overflow-hidden">
-          <SettingRow label="Export my data" right={<Download size={18} color="#888899" />} onPress={exportData} />
-          <SettingRow label="Delete all my data" danger onPress={() => setShowDeleteConfirm(true)} isLast />
-        </View>
-
-        {/* About */}
-        <SectionHeader label="About" />
-        <View className="bg-white border border-gray-border rounded-2xl overflow-hidden">
-          <SettingRow
-            label="What's new"
-            sub="Version 1.0.0"
-            right={
-              <View className="bg-purple-600 rounded-full px-2 py-0.5">
-                <Text className="text-white text-[11px] font-semibold">New</Text>
-              </View>
-            }
-            onPress={() => {}}
-          />
-          <SettingRow label="Terms of service" onPress={() => {}} />
-          <SettingRow label="Privacy policy" onPress={() => {}} isLast />
-        </View>
-
-        <Text className="text-center text-xs text-gray-text mt-6">Trayl v1.0.0 · PIPEDA compliant</Text>
-
-        <Pressable onPress={signOut} className="flex-row items-center justify-center gap-2 mt-3 py-3.5">
-          <LogOut size={16} color="#A32D2D" />
-          <Text className="text-status-danger text-base font-semibold">Sign out</Text>
-        </Pressable>
+        <Text style={{ fontFamily: 'IBMPlexMono_500Medium', fontSize: 9, letterSpacing: 0.9, textTransform: 'uppercase', color: 'rgba(0,0,0,.32)', paddingTop: 18, paddingBottom: 20, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,.09)', marginTop: 22 }}>
+          Trayl v1.0.0 · PIPEDA compliant
+        </Text>
       </ScrollView>
+
+      {/* Notifications quick-toggles */}
+      <Modal isOpen={showNotifModal} onClose={() => setShowNotifModal(false)}>
+        <Text className="text-base font-bold text-dark-text mb-4">Notifications</Text>
+        <View className="gap-3">
+          <View className="flex-row items-center justify-between bg-gray-bg rounded-xl px-3.5 py-3">
+            <View className="flex-1 pr-3">
+              <Text className="text-sm font-semibold text-dark-text">Check-in reminders</Text>
+              <Text className="text-xs text-gray-text">In-app countdown during walks</Text>
+            </View>
+            <Toggle on={prefs.checkin_reminders} onChange={(v) => setPrefs((p) => ({ ...p, checkin_reminders: v }))} />
+          </View>
+          <View className="flex-row items-center justify-between bg-gray-bg rounded-xl px-3.5 py-3">
+            <View className="flex-1 pr-3">
+              <Text className="text-sm font-semibold text-dark-text">Arrival summary</Text>
+              <Text className="text-xs text-gray-text">Notify when a walk ends</Text>
+            </View>
+            <Toggle on={prefs.walk_summary} onChange={(v) => setPrefs((p) => ({ ...p, walk_summary: v }))} />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Privacy quick-toggles */}
+      <Modal isOpen={showPrivacyModal} onClose={() => setShowPrivacyModal(false)}>
+        <Text className="text-base font-bold text-dark-text mb-4">Privacy</Text>
+        <View className="gap-3">
+          <View className="flex-row items-center justify-between bg-gray-bg rounded-xl px-3.5 py-3">
+            <View className="flex-1 pr-3">
+              <Text className="text-sm font-semibold text-dark-text">Location only during walks</Text>
+              <Text className="text-xs text-gray-text">Background tracking is never used</Text>
+            </View>
+            <Toggle on={true} onChange={() => {}} />
+          </View>
+          <View className="flex-row items-center justify-between bg-gray-bg rounded-xl px-3.5 py-3">
+            <View className="flex-1 pr-3">
+              <Text className="text-sm font-semibold text-dark-text">Auto-delete after 30 days</Text>
+              <Text className="text-xs text-gray-text">Walks &amp; location data</Text>
+            </View>
+            <Toggle on={prefs.auto_delete} onChange={(v) => setPrefs((p) => ({ ...p, auto_delete: v }))} />
+          </View>
+        </View>
+      </Modal>
 
       {/* Delete confirm modal */}
       <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)}>

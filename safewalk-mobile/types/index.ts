@@ -1,5 +1,16 @@
 // ─── Shared TypeScript types ───────────────────────────────────────────────
 
+// A distinct past destination, with its last known distance/duration so a
+// glance row (Home's recents, Search's recents) can show an ETA without
+// re-fetching directions just to render a list.
+export interface RecentDestination {
+  key: string;
+  name: string;
+  sub: string;
+  lastDistanceMeters: number | null;
+  lastDurationSeconds: number | null;
+}
+
 export interface Profile {
   id: string;
   full_name: string;
@@ -10,6 +21,8 @@ export interface Profile {
   updated_at: string;
 }
 
+export type ContactPermissionLevel = 'full' | 'live_route' | 'alerts_only';
+
 export interface TrustedContact {
   id: string;
   user_id: string;
@@ -17,6 +30,7 @@ export interface TrustedContact {
   phone: string;
   email: string | null;
   is_primary: boolean;
+  permission_level: ContactPermissionLevel;
   created_at: string;
 }
 

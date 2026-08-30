@@ -16,12 +16,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0a0a0a"
       },
-      "package": "com.anonymous.safewalkmobile",
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyAGYbk5dnM33-wLYNwwy7aVWpIS9ILbxpI"
-        }
-      }
+      "package": "com.anonymous.safewalkmobile"
     },
     "web": {
       "bundler": "metro",
@@ -40,7 +35,8 @@
         }
       ],
       "expo-font",
-      "expo-asset"
+      "expo-asset",
+      "@rnmapbox/maps"
     ],
     "experiments": {
       "typedRoutes": true

@@ -90,6 +90,17 @@ export function formatNavDistance(meters: number): string {
   return `${(meters / 1000).toFixed(1)} km`;
 }
 
+/**
+ * Plain distance label for a static list (e.g. the pre-walk turn-by-turn
+ * list) — unlike formatNavDistance, never says "Arriving": that wording only
+ * makes sense for live remaining-distance-to-next-maneuver, not a fixed
+ * step length shown ahead of time.
+ */
+export function formatStepDistance(meters: number): string {
+  if (meters < 1000) return `${Math.max(10, Math.round(meters / 10) * 10)} m`;
+  return `${(meters / 1000).toFixed(1)} km`;
+}
+
 export function formatNavDuration(seconds: number): string {
   if (seconds < 60) return '< 1 min';
   const m = Math.round(seconds / 60);
