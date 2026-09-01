@@ -15,6 +15,11 @@ export interface Profile {
   id: string;
   full_name: string;
   phone: string | null;
+  phone_verified_at: string | null;
+  gender: string | null;
+  pronouns: string | null;
+  date_of_birth: string | null;
+  accessibility_notes: string | null;
   avatar_initials: string | null;
   onboarding_completed: boolean;
   created_at: string;

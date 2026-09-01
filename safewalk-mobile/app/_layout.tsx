@@ -19,6 +19,7 @@ import Toast from 'react-native-toast-message';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Mapbox from '@rnmapbox/maps';
 import { AuthGate } from '../lib/authGate';
+import { registerSosNotificationListener, setupSosNotifications } from '../services/sosNotification';
 import '../global.css';
 
 SplashScreen.preventAutoHideAsync();
@@ -40,6 +41,11 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontsLoaded) SplashScreen.hideAsync();
   }, [fontsLoaded]);
+
+  useEffect(() => {
+    setupSosNotifications();
+    return registerSosNotificationListener();
+  }, []);
 
   if (!fontsLoaded) return null;
 

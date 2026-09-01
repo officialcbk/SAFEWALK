@@ -36,7 +36,14 @@
       ],
       "expo-font",
       "expo-asset",
-      "@rnmapbox/maps"
+      "@rnmapbox/maps",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/adaptive-icon.png",
+          "color": "#0A0A0A"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

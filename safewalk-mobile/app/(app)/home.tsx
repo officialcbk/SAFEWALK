@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, Share, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Share, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { differenceInSeconds } from 'date-fns';
 import Toast from 'react-native-toast-message';
@@ -15,8 +15,10 @@ import { useNavigation } from '../../hooks/useNavigation';
 import { formatNavDistance, humanizeInstruction } from '../../services/navigation';
 import { formatPace, formatArrivalClock } from '../../services/eta';
 import { getNearbyPlaces, type SafePlace } from '../../services/safePlaces';
-import { buildShareUrl } from '../../services/alert';
+import { buildShareUrl, triggerSOS } from '../../services/alert';
+import { dismissWalkNotification, showWalkNotification } from '../../services/sosNotification';
 import { getDirections, searchOne } from '../../services/directions';
+import { withTimeout } from '../../services/withTimeout';
 import { MapView, type MapViewHandle } from '../../components/map/MapView';
 import { HomeIdle } from '../../components/home/HomeIdle';
 import { SosButton } from '../../components/walk/SosButton';
@@ -128,8 +130,22 @@ export default function Home() {
   const isActive = !!walk.sessionId;
   useNavigation(isActive);
 
+  // Lock-screen SOS notification tracks the walk itself, not this screen —
+  // shown whenever a walk is active (including on a fresh app launch that
+  // resumes a persisted walk), dismissed the moment it ends.
+  useEffect(() => {
+    if (isActive) {
+      showWalkNotification(walk.destination);
+    } else {
+      dismissWalkNotification();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive]);
+
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [endingWalk, setEndingWalk] = useState(false);
   const [showCheckIn, setShowCheckIn] = useState(false);
+  const [findingAlternate, setFindingAlternate] = useState(false);
   const [showSosOverlay, setShowSosOverlay] = useState(false);
   const [sosContacts, setSosContacts] = useState<{ name: string; phone: string }[]>([]);
 
@@ -258,19 +274,24 @@ export default function Home() {
   // turn-by-turn, not just a repositioned line) and demote the old primary
   // to the thin secondary line so it's still visible as a fallback.
   const handleTryAlternateRoute = async () => {
-    if (!currentLoc || !destinationCoords) return;
-    const result = await getDirections([currentLoc.lng, currentLoc.lat], destinationCoords);
-    if (!result) { Toast.show({ type: 'error', text1: "Couldn't find a route." }); return; }
-    if (!result.alternate) {
-      Toast.show({ type: 'info', text1: 'No alternate route available.', text2: "This is the only way Mapbox knows to get there." });
-      return;
+    if (!currentLoc || !destinationCoords || findingAlternate) return;
+    setFindingAlternate(true);
+    try {
+      const result = await getDirections([currentLoc.lng, currentLoc.lat], destinationCoords);
+      if (!result) { Toast.show({ type: 'error', text1: "Couldn't find a route." }); return; }
+      if (!result.alternate) {
+        Toast.show({ type: 'info', text1: 'No alternate route available.', text2: "This is the only way Mapbox knows to get there." });
+        return;
+      }
+      setRouteCoords(result.alternate.geometry);
+      setAlternateRouteCoords(result.geometry);
+      setNavSteps(result.alternate.steps);
+      setDistance(result.alternate.totalDistance);
+      setRouteDurationSeconds(result.alternate.totalDuration);
+      Toast.show({ type: 'success', text1: 'Switched to an alternate route.' });
+    } finally {
+      setFindingAlternate(false);
     }
-    setRouteCoords(result.alternate.geometry);
-    setAlternateRouteCoords(result.geometry);
-    setNavSteps(result.alternate.steps);
-    setDistance(result.alternate.totalDistance);
-    setRouteDurationSeconds(result.alternate.totalDuration);
-    Toast.show({ type: 'success', text1: 'Switched to an alternate route.' });
   };
 
   const handleShareLiveLink = () => {
@@ -312,16 +333,29 @@ export default function Home() {
 
   // ── End walk ──────────────────────────────────────────────────────────────
   const handleEnd = async () => {
+    if (endingWalk) return;
+    setEndingWalk(true);
     setShowEndConfirm(false);
     stopTracking();
     if (walk.sessionId) {
       const secs = walk.startedAt ? differenceInSeconds(new Date(), new Date(walk.startedAt)) : 0;
-      await supabase.from('walk_sessions').update({
-        status: 'completed',
-        ended_at: new Date().toISOString(),
-        duration_seconds: secs,
-        distance_meters: Math.round(walk.distanceMeters),
-      }).eq('id', walk.sessionId);
+      try {
+        // A stalled connection can leave this await neither resolving nor
+        // rejecting, which used to leave the walk stuck "active" forever
+        // with no error and no way out — see withTimeout.ts. Ending the
+        // walk locally must never depend on this call actually landing.
+        await withTimeout(
+          supabase.from('walk_sessions').update({
+            status: 'completed',
+            ended_at: new Date().toISOString(),
+            duration_seconds: secs,
+            distance_meters: Math.round(walk.distanceMeters),
+          }).eq('id', walk.sessionId),
+          10000,
+        );
+      } catch {
+        Toast.show({ type: 'error', text1: "Couldn't sync this walk", text2: "It ended on your device but may not be saved to history." });
+      }
     }
     endWalk(watchingContacts.map((c) => c.full_name.split(' ')[0])); // snapshots lastWalkSummary in the store before resetting
     setCurrentLoc(null);
@@ -332,6 +366,7 @@ export default function Home() {
     setShowHelpMenu(false);
     setOneHandedMode(false);
     setNearDestination(false);
+    setEndingWalk(false);
     startTracking();
     router.replace('/walk-summary');
   };
@@ -342,21 +377,22 @@ export default function Home() {
     setStatus('sos_triggered');
     setEscalationStage(2);
     markSOS();
-    await supabase.from('walk_sessions').update({ status: 'sos_triggered' }).eq('id', walk.sessionId);
-    const { data: contacts } = await supabase
-      .from('trusted_contacts').select('full_name, phone').eq('user_id', user.id);
-    const list = (contacts ?? []).map((c) => ({ name: c.full_name, phone: c.phone }));
-    setSosContacts(list);
+    // Show the overlay (Cancel SOS / Call 911 are already live) before any
+    // network call — a stalled connection must never delay this, and used
+    // to leave the whole SOS flow silent with no visible feedback at all
+    // while these awaits hung. See withTimeout.ts.
+    setSosContacts([]);
     setShowSosOverlay(true);
-    if (list.length) {
-      const shareUrl = walk.shareToken ? buildShareUrl(walk.shareToken) : null;
-      const name = profile?.full_name || user.email || 'Someone';
-      const message = shareUrl
-        ? `EMERGENCY: ${name} has triggered an SOS on Trayl. Track their live location: ${shareUrl}`
-        : `EMERGENCY: ${name} has triggered an SOS on Trayl. Please check on them immediately.`;
-      await supabase.functions.invoke('send-alert', { body: { contacts: list, message } });
-    } else {
-      Toast.show({ type: 'error', text1: 'No trusted contacts', text2: 'Add contacts so they can be alerted.' });
+
+    const { contacts, alertError } = await triggerSOS({
+      sessionId: walk.sessionId,
+      userId: user.id,
+      userName: profile?.full_name || user.email || 'Someone',
+      shareToken: walk.shareToken,
+    });
+    setSosContacts(contacts);
+    if (alertError) {
+      Toast.show({ type: 'error', text1: alertError, text2: 'Call your contacts directly if you can.' });
     }
   };
 
@@ -748,14 +784,19 @@ export default function Home() {
                 <View className="flex-row items-center" style={{ gap: 8 }}>
                   <Pressable
                     onPress={handleTryAlternateRoute}
+                    disabled={findingAlternate}
                     accessibilityRole="button"
                     accessibilityLabel="Try an alternate route"
-                    style={{ width: 42, height: 54, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(0,0,0,.12)', alignItems: 'center', justifyContent: 'center' }}
+                    style={{ width: 42, height: 54, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(0,0,0,.12)', alignItems: 'center', justifyContent: 'center', opacity: findingAlternate ? 0.5 : 1 }}
                   >
-                    <Svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-                      <Path d="M17 2.5 21 6l-4 3.5" /><Path d="M21 6H8a5 5 0 0 0-5 5v0" />
-                      <Path d="M7 21.5 3 18l4-3.5" /><Path d="M3 18h13a5 5 0 0 0 5-5v0" />
-                    </Svg>
+                    {findingAlternate ? (
+                      <ActivityIndicator size="small" color="#0A0A0A" />
+                    ) : (
+                      <Svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                        <Path d="M17 2.5 21 6l-4 3.5" /><Path d="M21 6H8a5 5 0 0 0-5 5v0" />
+                        <Path d="M7 21.5 3 18l4-3.5" /><Path d="M3 18h13a5 5 0 0 0 5-5v0" />
+                      </Svg>
+                    )}
                   </Pressable>
                   <SosButton onActivated={handleSOS} variant="filled" />
                 </View>

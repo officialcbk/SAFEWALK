@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
@@ -11,8 +11,10 @@ import { useWalkStore } from '../../store/walkStore';
 import { MapView, type MapViewHandle } from '../../components/map/MapView';
 import { BottomSheet } from '../../components/ui/BottomSheet';
 import { ManeuverIcon } from '../../components/walk/ManeuverIcon';
+import { useSettingsPrefs } from '../../components/account/SettingsPrefs';
 import { formatNavDistance, formatNavDuration, formatStepDistance, humanizeInstruction } from '../../services/navigation';
 import { formatArrivalClock } from '../../services/eta';
+import { withTimeout } from '../../services/withTimeout';
 import type { TrustedContact } from '../../types';
 
 const CHECKIN_PRESETS = [3, 5, 10, 15];
@@ -37,6 +39,8 @@ export default function WalkConfirm() {
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const mapRef = useRef<MapViewHandle>(null);
+  const hasPickedCheckInRef = useRef(false);
+  const { prefs } = useSettingsPrefs();
   const {
     walk, startWalk, routeCoords, alternateRouteCoords, destinationCoords, destinationFullAddress,
     routeDurationSeconds, navSteps, setSharedContactIds, setCheckInIntervalSeconds,
@@ -70,11 +74,19 @@ export default function WalkConfirm() {
     if (!user || starting) return;
     setStarting(true);
     try {
-      const { data: session, error } = await supabase
-        .from('walk_sessions')
-        .insert({ user_id: user.id, destination: walk.destination })
-        .select()
-        .single();
+      const { data: session, error } = await withTimeout(
+        supabase
+          .from('walk_sessions')
+          .insert({
+            user_id: user.id,
+            destination: walk.destination,
+            route_coords: routeCoords,
+            destination_coords: destinationCoords,
+          })
+          .select()
+          .single(),
+        10000,
+      );
       if (error || !session) {
         Toast.show({ type: 'error', text1: "Couldn't start walk. Try again." });
         return;
@@ -93,6 +105,12 @@ export default function WalkConfirm() {
       setStarting(false);
     }
   };
+
+  useEffect(() => {
+    if (!hasPickedCheckInRef.current) {
+      setCheckInMinutes(Number(prefs.checkinInterval));
+    }
+  }, [prefs.checkinInterval]);
 
   const arriveAt = routeDurationSeconds != null ? formatArrivalClock(routeDurationSeconds) : '—';
   const durationLabel = routeDurationSeconds != null ? formatNavDuration(routeDurationSeconds) : '—';
@@ -187,7 +205,10 @@ export default function WalkConfirm() {
                 return (
                   <Pressable
                     key={mins}
-                    onPress={() => setCheckInMinutes(mins)}
+                    onPress={() => {
+                      hasPickedCheckInRef.current = true;
+                      setCheckInMinutes(mins);
+                    }}
                     style={{
                       flex: 1, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
                       backgroundColor: active ? '#0A0A0A' : '#fff', borderWidth: 1, borderColor: active ? '#0A0A0A' : 'rgba(0,0,0,.15)',

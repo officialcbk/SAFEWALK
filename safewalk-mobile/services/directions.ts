@@ -3,6 +3,16 @@
 
 const token = () => process.env.EXPO_PUBLIC_MAPBOX_TOKEN as string;
 
+// A stalled connection can leave `fetch` neither resolving nor rejecting —
+// the exact failure mode that once left the "Starting…" button stuck forever
+// (see walk-confirm.tsx). Every call in this file routes through here so a
+// flaky network makes a request fail fast instead of hanging silently.
+function fetchWithTimeout(url: string, ms = 10000): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(id));
+}
+
 export interface RouteStep {
   instruction: string;    // e.g. "Turn left onto Main St"
   name: string;           // street name (may be empty)
@@ -42,7 +52,7 @@ export async function getDirections(
       `?steps=true&overview=full&geometries=geojson&language=en&alternatives=true` +
       `&access_token=${token()}`;
 
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.routes?.length) return null;
@@ -88,7 +98,7 @@ export async function geocodeAddress(query: string): Promise<[number, number] | 
     const url =
       `https://api.mapbox.com/geocoding/v5/mapbox.places/` +
       `${encodeURIComponent(query)}.json?limit=1&access_token=${token()}`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.features?.length) return null;
@@ -132,7 +142,7 @@ export async function suggestPlaces(
     const url =
       `https://api.mapbox.com/search/searchbox/v1/suggest?q=${encodeURIComponent(query)}` +
       `&session_token=${sessionToken}&access_token=${token()}&country=ca&language=en&limit=6${near}`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) return [];
     const data = await res.json();
     return (data.suggestions ?? [])
@@ -168,7 +178,7 @@ export async function retrievePlace(mapboxId: string, sessionToken: string): Pro
     const url =
       `https://api.mapbox.com/search/searchbox/v1/retrieve/${mapboxId}` +
       `?session_token=${sessionToken}&access_token=${token()}`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) return null;
     const data = await res.json();
     return data.features?.[0]?.geometry?.coordinates ?? null;
@@ -188,7 +198,7 @@ export async function reverseGeocode(coord: [number, number], options?: { full?:
     const url =
       `https://api.mapbox.com/geocoding/v5/mapbox.places/${coord[0]},${coord[1]}.json` +
       `?types=address,poi&limit=1&access_token=${token()}`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.features?.length) return null;

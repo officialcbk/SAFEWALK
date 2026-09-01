@@ -1,12 +1,12 @@
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../../lib/supabase';
-import { Input } from '../../components/ui/Input';
-import { Button } from '../../components/ui/Button';
 import { AuthPage } from '../../components/layout/AuthPage';
+import { MonoLogoMark } from '../../components/LogoMark';
+import { FormInput } from '../../components/auth/FormInput';
 
 const schema = z
   .object({
@@ -31,15 +31,18 @@ export default function ResetPassword() {
   return (
     <AuthPage>
       <View className="flex-1 items-center justify-center gap-6">
-        <Text className="text-base font-bold text-dark-text">New password</Text>
-        <View className="w-full max-w-[280px] gap-4">
+        <MonoLogoMark />
+        <Text className="text-2xl font-sans-extrabold text-ink tracking-tight">New password</Text>
+        <View className="w-full max-w-[320px] gap-3.5">
           <Controller
             control={control}
             name="password"
             render={({ field }) => (
-              <Input
+              <FormInput
                 label="New password"
                 isPassword
+                autoComplete="new-password"
+                textContentType="newPassword"
                 placeholder="Min. 8 characters"
                 error={errors.password?.message}
                 value={field.value}
@@ -52,9 +55,11 @@ export default function ResetPassword() {
             control={control}
             name="confirm"
             render={({ field }) => (
-              <Input
+              <FormInput
                 label="Confirm password"
                 isPassword
+                autoComplete="new-password"
+                textContentType="newPassword"
                 placeholder="••••••••"
                 error={errors.confirm?.message}
                 value={field.value}
@@ -63,9 +68,16 @@ export default function ResetPassword() {
               />
             )}
           />
-          <Button loading={isSubmitting} fullWidth onPress={handleSubmit(onSubmit)}>
-            Set new password
-          </Button>
+          <Pressable
+            disabled={isSubmitting}
+            onPress={handleSubmit(onSubmit)}
+            className="h-[54px] rounded-2xl bg-ink items-center justify-center flex-row gap-2 mt-1"
+            style={{ opacity: isSubmitting ? 0.6 : 1 }}
+          >
+            <Text className="font-sans-bold text-[15px] text-white">
+              {isSubmitting ? 'Saving…' : 'Set new password'}
+            </Text>
+          </Pressable>
         </View>
       </View>
     </AuthPage>

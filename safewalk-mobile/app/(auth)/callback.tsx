@@ -67,9 +67,9 @@ export default function AuthCallback() {
     return (
       <AuthPage>
         <View className="flex-1 items-center justify-center gap-4">
-          <Text className="text-base font-bold text-dark-text text-center">Sign-in link didn&apos;t work</Text>
-          <Text className="text-sm text-gray-text text-center leading-relaxed">{error}</Text>
-          <Link href="/sign-in" className="text-sm font-semibold text-purple-600">
+          <Text className="text-base font-sans-bold text-ink text-center">Sign-in link didn&apos;t work</Text>
+          <Text className="text-sm font-sans text-black/50 text-center leading-relaxed">{error}</Text>
+          <Link href="/sign-in" className="text-sm font-sans-semibold text-ink">
             Back to sign in
           </Link>
         </View>

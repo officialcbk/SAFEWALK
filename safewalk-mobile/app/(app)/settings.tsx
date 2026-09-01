@@ -6,7 +6,6 @@ import Toast from 'react-native-toast-message';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { useWalkStore } from '../../store/walkStore';
-import { Toggle } from '../../components/ui/Toggle';
 import { Modal } from '../../components/ui/Modal';
 
 function initialsOf(name: string): string {
@@ -51,17 +50,12 @@ function AccountTile({ name, sub, isFirst, onPress }: { name: string; sub: strin
   );
 }
 
-const comingSoon = () => Toast.show({ type: 'info', text1: "Not built yet — coming soon." });
-
 export default function Settings() {
   const { user, profile, clear } = useAuthStore();
   const endWalk = useWalkStore((s) => s.endWalk);
   const router = useRouter();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
-  const [showNotifModal, setShowNotifModal] = useState(false);
-  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
-  const [prefs, setPrefs] = useState({ checkin_reminders: true, walk_summary: true, auto_delete: true });
 
   const { data: profileData } = useQuery({
     queryKey: ['profile', user?.id],
@@ -124,12 +118,13 @@ export default function Settings() {
   };
 
   const accountTiles = [
-    { name: 'Settings', sub: 'Units, map, appearance', onPress: comingSoon },
-    { name: 'Notifications', sub: 'Check-ins, arrivals', onPress: () => setShowNotifModal(true) },
-    { name: 'Safety', sub: 'SOS, escalation, check-in timing', onPress: comingSoon },
-    { name: 'Emergency info', sub: 'Shared with responders only', onPress: comingSoon },
-    { name: 'Places', sub: 'Home, Work, 4 saved', onPress: comingSoon },
-    { name: 'Privacy', sub: 'Who can see your live route', onPress: () => setShowPrivacyModal(true) },
+    { name: 'Settings', sub: 'Units, map, appearance', onPress: () => router.push('/account-app-settings') },
+    { name: 'Security', sub: 'Password, phone verification', onPress: () => router.push('/account-security') },
+    { name: 'Notifications', sub: 'Check-ins, arrivals', onPress: () => router.push('/account-notifications') },
+    { name: 'Safety', sub: 'SOS, escalation, check-in timing', onPress: () => router.push('/account-safety') },
+    { name: 'Emergency info', sub: 'Shared with responders only', onPress: () => router.push('/account-emergency') },
+    { name: 'Places', sub: 'Home, Work, saved locations', onPress: () => router.push('/account-places') },
+    { name: 'Privacy', sub: 'Who can see your live route', onPress: () => router.push('/account-privacy') },
   ];
 
   const supportTiles = [
@@ -137,8 +132,8 @@ export default function Settings() {
       name: 'Refer friends', sub: 'Invite a walker, both get 1 month',
       onPress: () => Share.share({ message: 'Stay safe on your walks with Trayl — it alerts my contacts if I need help. Check it out!' }).catch(() => {}),
     },
-    { name: 'Help', sub: 'Guides and contact', onPress: comingSoon },
-    { name: 'Legal', sub: 'Terms, privacy, licences', onPress: comingSoon },
+    { name: 'Help', sub: 'Guides and contact', onPress: () => router.push('/account-help') },
+    { name: 'Legal', sub: 'Terms, privacy, licences', onPress: () => router.push('/account-legal') },
     { name: 'Sign out', sub: displayName, onPress: signOut },
   ];
 
@@ -209,48 +204,6 @@ export default function Settings() {
           Trayl v1.0.0 · PIPEDA compliant
         </Text>
       </ScrollView>
-
-      {/* Notifications quick-toggles */}
-      <Modal isOpen={showNotifModal} onClose={() => setShowNotifModal(false)}>
-        <Text className="text-base font-bold text-dark-text mb-4">Notifications</Text>
-        <View className="gap-3">
-          <View className="flex-row items-center justify-between bg-gray-bg rounded-xl px-3.5 py-3">
-            <View className="flex-1 pr-3">
-              <Text className="text-sm font-semibold text-dark-text">Check-in reminders</Text>
-              <Text className="text-xs text-gray-text">In-app countdown during walks</Text>
-            </View>
-            <Toggle on={prefs.checkin_reminders} onChange={(v) => setPrefs((p) => ({ ...p, checkin_reminders: v }))} />
-          </View>
-          <View className="flex-row items-center justify-between bg-gray-bg rounded-xl px-3.5 py-3">
-            <View className="flex-1 pr-3">
-              <Text className="text-sm font-semibold text-dark-text">Arrival summary</Text>
-              <Text className="text-xs text-gray-text">Notify when a walk ends</Text>
-            </View>
-            <Toggle on={prefs.walk_summary} onChange={(v) => setPrefs((p) => ({ ...p, walk_summary: v }))} />
-          </View>
-        </View>
-      </Modal>
-
-      {/* Privacy quick-toggles */}
-      <Modal isOpen={showPrivacyModal} onClose={() => setShowPrivacyModal(false)}>
-        <Text className="text-base font-bold text-dark-text mb-4">Privacy</Text>
-        <View className="gap-3">
-          <View className="flex-row items-center justify-between bg-gray-bg rounded-xl px-3.5 py-3">
-            <View className="flex-1 pr-3">
-              <Text className="text-sm font-semibold text-dark-text">Location only during walks</Text>
-              <Text className="text-xs text-gray-text">Background tracking is never used</Text>
-            </View>
-            <Toggle on={true} onChange={() => {}} />
-          </View>
-          <View className="flex-row items-center justify-between bg-gray-bg rounded-xl px-3.5 py-3">
-            <View className="flex-1 pr-3">
-              <Text className="text-sm font-semibold text-dark-text">Auto-delete after 30 days</Text>
-              <Text className="text-xs text-gray-text">Walks &amp; location data</Text>
-            </View>
-            <Toggle on={prefs.auto_delete} onChange={(v) => setPrefs((p) => ({ ...p, auto_delete: v }))} />
-          </View>
-        </View>
-      </Modal>
 
       {/* Delete confirm modal */}
       <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)}>

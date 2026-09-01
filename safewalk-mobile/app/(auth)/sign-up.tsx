@@ -1,14 +1,13 @@
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../../lib/supabase';
-import { Input } from '../../components/ui/Input';
-import { Button } from '../../components/ui/Button';
 import { AuthPage } from '../../components/layout/AuthPage';
-import { LogoBadge } from '../../components/LogoMark';
+import { MonoLogoMark } from '../../components/LogoMark';
+import { FormInput } from '../../components/auth/FormInput';
 
 const schema = z.object({
   full_name: z.string().min(1, 'Name is required'),
@@ -17,9 +16,11 @@ const schema = z.object({
 });
 type FormData = z.infer<typeof schema>;
 
+// Semantic strength colors — separate from the app's monochrome accent, same
+// as the safe/warn/danger tokens used for check-in and status elsewhere.
 function strengthInfo(pw: string) {
-  if (pw.length < 6) return { label: 'Weak', color: '#E24B4A', w: '30%' as const };
-  if (pw.length < 10) return { label: 'Fair', color: '#E8A020', w: '60%' as const };
+  if (pw.length < 6) return { label: 'Weak', color: '#E5342A', w: '30%' as const };
+  if (pw.length < 10) return { label: 'Fair', color: '#B5860B', w: '60%' as const };
   return { label: 'Strong', color: '#3B6D11', w: '100%' as const };
 }
 
@@ -57,10 +58,10 @@ export default function SignUp() {
     <AuthPage>
       <View className="flex-1">
         <View className="mt-4 items-center gap-3 mb-6">
-          <LogoBadge />
+          <MonoLogoMark />
           <View className="items-center">
-            <Text className="text-[22px] font-bold text-dark-text tracking-tight">Create account</Text>
-            <Text className="text-[13px] text-gray-text mt-0.5">Safe in 2 minutes</Text>
+            <Text className="text-[22px] font-sans-extrabold text-ink tracking-tight">Create account</Text>
+            <Text className="text-[13px] font-sans text-black/50 mt-0.5">Safe in 2 minutes</Text>
           </View>
         </View>
 
@@ -69,7 +70,7 @@ export default function SignUp() {
             control={control}
             name="full_name"
             render={({ field }) => (
-              <Input
+              <FormInput
                 label="Full name"
                 autoComplete="name"
                 placeholder="Alex Johnson"
@@ -84,7 +85,7 @@ export default function SignUp() {
             control={control}
             name="email"
             render={({ field }) => (
-              <Input
+              <FormInput
                 label="Email"
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -103,7 +104,7 @@ export default function SignUp() {
               control={control}
               name="password"
               render={({ field }) => (
-                <Input
+                <FormInput
                   label="Password"
                   isPassword
                   autoComplete="new-password"
@@ -118,33 +119,40 @@ export default function SignUp() {
             />
             {strength && (
               <View className="flex-row items-center gap-2 mt-1.5">
-                <View className="flex-1 h-1 bg-gray-bg rounded-full overflow-hidden">
+                <View className="flex-1 h-1 bg-fill rounded-full overflow-hidden">
                   <View style={{ width: strength.w, backgroundColor: strength.color }} className="h-full rounded-full" />
                 </View>
-                <Text style={{ color: strength.color }} className="text-[11px] font-semibold">
+                <Text style={{ color: strength.color }} className="text-[11px] font-sans-semibold">
                   {strength.label}
                 </Text>
               </View>
             )}
           </View>
 
-          <Button loading={isSubmitting} fullWidth onPress={handleSubmit(onSubmit)} className="mt-1">
-            Create account
-          </Button>
+          <Pressable
+            disabled={isSubmitting}
+            onPress={handleSubmit(onSubmit)}
+            className="h-[54px] rounded-2xl bg-ink items-center justify-center flex-row gap-2 mt-1"
+            style={{ opacity: isSubmitting ? 0.6 : 1 }}
+          >
+            <Text className="font-sans-bold text-[15px] text-white">
+              {isSubmitting ? 'Creating account…' : 'Create account'}
+            </Text>
+          </Pressable>
         </View>
 
-        <Text className="text-center mt-3 text-xs text-gray-text">
+        <Text className="text-center mt-3 text-xs font-sans text-black/50">
           By creating an account you agree to our{' '}
-          <Text className="text-purple-600 font-semibold">Terms</Text> ·{' '}
-          <Text className="text-purple-600 font-semibold">Privacy</Text>
+          <Text className="text-ink font-sans-semibold">Terms</Text> ·{' '}
+          <Text className="text-ink font-sans-semibold">Privacy</Text>
         </Text>
 
         <View className="flex-1" />
 
         <View className="flex-row justify-center mt-4">
-          <Text className="text-[13px] text-gray-text">Already have an account? </Text>
+          <Text className="text-[13px] font-sans text-black/50">Already have an account? </Text>
           <Link href="/sign-in" asChild>
-            <Text className="text-[13px] font-semibold text-purple-600">Sign in →</Text>
+            <Text className="text-[13px] font-sans-semibold text-ink">Sign in →</Text>
           </Link>
         </View>
       </View>

@@ -39,3 +39,30 @@ export function LogoMark() {
     </View>
   );
 }
+
+/** Monochrome badge, matching the black/white system used elsewhere in the app. */
+export function MonoLogoBadge({ size = 28 }: { size?: number }) {
+  const iconSize = Math.round(size * 0.8);
+  return (
+    <View
+      className="items-center justify-center bg-ink"
+      style={{ width: size, height: size, borderRadius: size * 0.32 }}
+    >
+      <Svg width={iconSize} height={iconSize} viewBox="0 0 64 64">
+        <Circle cx={32} cy={32} r={24} fill="none" stroke="rgba(255,255,255,0.32)" strokeWidth={2.2} />
+        <Circle cx={32} cy={32} r={15} fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth={2.2} />
+        <Circle cx={32} cy={32} r={6} fill="white" />
+      </Svg>
+    </View>
+  );
+}
+
+/** Monochrome "Trayl" wordmark pill — the auth screens' current design system. */
+export function MonoLogoMark() {
+  return (
+    <View className="flex-row items-center gap-2 bg-white rounded-full px-3.5 py-2 self-center border border-black/10">
+      <MonoLogoBadge size={28} />
+      <Text className="font-sans-bold text-sm text-ink">Trayl</Text>
+    </View>
+  );
+}
