@@ -1,0 +1,15 @@
+
+> safewalk-mobile@1.0.0 start
+> expo start --lan
+
+env: load .env
+env: export EXPO_PUBLIC_MAPBOX_TOKEN EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_WEB_BASE_URL
+Starting project at C:\Users\user\Downloads\SAFEWALK\safewalk-mobile
+ ERROR  An unknown error occurred while installing React Native DevTools. Details:
+
+spawn EPERM
+Starting Metro Bundler
+
+Waiting on http://localhost:8081
+
+Logs for your project will appear below.

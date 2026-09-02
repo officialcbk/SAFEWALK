@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { useWalkStore } from '../store/walkStore';
+import { withTimeout } from '../services/withTimeout';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
 
@@ -83,6 +84,7 @@ export default function Settings() {
   const navigate = useNavigate();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
+  const [deleting, setDeleting] = useState(false);
   const [prefs, setPrefs] = useState({ checkin_reminders: true, walk_summary: true, auto_delete: true });
 
   const { data: profileData } = useQuery({
@@ -98,7 +100,13 @@ export default function Settings() {
   const initials = displayName.slice(0, 2).toUpperCase();
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await withTimeout(supabase.auth.signOut(), 10000);
+    } catch {
+      // Clear local state and leave regardless — staying signed in locally
+      // because the network call hung would be worse than a stale server
+      // session the next sign-in naturally replaces.
+    }
     endWalk();
     clear();
     navigate('/sign-in', { replace: true });
@@ -106,30 +114,48 @@ export default function Settings() {
 
   const exportData = async () => {
     if (!user) return;
-    const [{ data: p }, { data: c }, { data: w }] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', user.id),
-      supabase.from('trusted_contacts').select('*').eq('user_id', user.id),
-      supabase.from('walk_sessions').select('*').eq('user_id', user.id),
-    ]);
-    const blob = new Blob([JSON.stringify({ profile: p, contacts: c, walks: w }, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `safewalk-data-${Date.now()}.json`;
-    a.click();
+    try {
+      const [{ data: p }, { data: c }, { data: w }] = await withTimeout(
+        Promise.all([
+          supabase.from('profiles').select('*').eq('id', user.id),
+          supabase.from('trusted_contacts').select('*').eq('user_id', user.id),
+          supabase.from('walk_sessions').select('*').eq('user_id', user.id),
+        ]),
+        10000,
+      );
+      const blob = new Blob([JSON.stringify({ profile: p, contacts: c, walks: w }, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `safewalk-data-${Date.now()}.json`;
+      a.click();
+    } catch {
+      toast.error("Couldn't export your data. Try again.");
+    }
   };
 
   const deleteAll = async () => {
-    if (!user || deleteInput !== 'DELETE') return;
-    await Promise.all([
-      supabase.from('trusted_contacts').delete().eq('user_id', user.id),
-      supabase.from('walk_sessions').delete().eq('user_id', user.id),
-    ]);
-    await supabase.functions.invoke('delete-account', { body: { user_id: user.id } });
-    await supabase.auth.signOut();
-    endWalk();
-    clear();
-    navigate('/sign-in', { replace: true });
-    toast.success('All data deleted. Account removed.');
+    if (!user || deleteInput !== 'DELETE' || deleting) return;
+    setDeleting(true);
+    try {
+      // The edge function deletes everything (contacts, walks, profile,
+      // feedback, and the auth account itself) atomically server-side — it
+      // used to not exist at all, so this call silently failed and the app
+      // claimed success anyway while the real auth account lived on.
+      const { error } = await withTimeout(supabase.functions.invoke('delete-account'), 15000);
+      if (error) {
+        toast.error("Couldn't delete your account. Try again.");
+        return;
+      }
+      await supabase.auth.signOut();
+      endWalk();
+      clear();
+      navigate('/sign-in', { replace: true });
+      toast.success('All data deleted. Account removed.');
+    } catch {
+      toast.error("Couldn't delete your account. Try again.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -149,6 +175,37 @@ export default function Settings() {
           </div>
           <button className="h-9 px-3.5 bg-[#EEEDFE] text-[#534AB7] border border-[#DCD9FB] rounded-[14px] text-[13px] font-semibold flex items-center justify-center">
             Edit
+          </button>
+        </div>
+
+        {/* Refer a friend */}
+        <div
+          className="rounded-[16px] p-4 mb-2 flex items-center gap-3.5 overflow-hidden relative"
+          style={{ background: 'linear-gradient(135deg,#534AB7,#7F77DD)' }}
+        >
+          <div className="w-12 h-12 rounded-[14px] bg-white/15 flex items-center justify-center flex-shrink-0">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 12V22H4V12"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7"/>
+              <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+              <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[15px] font-bold text-white leading-tight">Refer a friend</div>
+            <div className="text-[12px] text-white/80 mt-0.5 leading-tight">Invite someone you walk with to stay safe</div>
+          </div>
+          <button
+            onClick={() => {
+              const msg = 'Stay safe on your walks with SafeWalk — it alerts my contacts if I need help. Check it out!';
+              if (navigator.share) {
+                navigator.share({ title: 'SafeWalk', text: msg }).catch(() => {});
+              } else {
+                navigator.clipboard.writeText(msg).then(() => toast.success('Link copied!'));
+              }
+            }}
+            className="h-9 px-3.5 bg-white text-[#534AB7] rounded-[12px] text-[13px] font-bold flex items-center justify-center flex-shrink-0"
+          >
+            Share
           </button>
         </div>
 
@@ -180,8 +237,25 @@ export default function Settings() {
             label="Auto-delete after 30 days"
             sub="Walks & location data"
             right={<Toggle on={prefs.auto_delete} onChange={(v) => setPrefs((p) => ({ ...p, auto_delete: v }))} />}
+            isLast
           />
-          <SettingRow label="Privacy policy" onClick={() => {}} isLast />
+        </div>
+
+        {/* Support */}
+        <SectionHeader label="Support" />
+        <div className="bg-white border border-[#E0E0E8] rounded-[14px] overflow-hidden">
+          <SettingRow
+            label="Rate SafeWalk"
+            sub="Leave a review on the App Store"
+            right={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+            }
+            onClick={() => {}}
+          />
+          <SettingRow label="Help &amp; FAQ" sub="Common questions answered" onClick={() => {}} />
+          <SettingRow label="Report a problem" sub="Something not working? Tell us" onClick={() => {}} isLast />
         </div>
 
         {/* Data */}
@@ -197,6 +271,21 @@ export default function Settings() {
             onClick={exportData}
           />
           <SettingRow label="Delete all my data" danger onClick={() => setShowDeleteConfirm(true)} isLast />
+        </div>
+
+        {/* About */}
+        <SectionHeader label="About" />
+        <div className="bg-white border border-[#E0E0E8] rounded-[14px] overflow-hidden">
+          <SettingRow
+            label="What's new"
+            sub="Version 1.0.0"
+            right={
+              <span className="text-[11px] font-semibold text-white bg-[#534AB7] rounded-full px-2 py-0.5">New</span>
+            }
+            onClick={() => {}}
+          />
+          <SettingRow label="Terms of service" onClick={() => {}} />
+          <SettingRow label="Privacy policy" onClick={() => {}} isLast />
         </div>
 
         {/* Footer */}
@@ -234,16 +323,17 @@ export default function Settings() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 h-[52px] rounded-[14px] border border-[#E0E0E8] text-[14px] font-semibold text-[#888899] flex items-center justify-center"
+                disabled={deleting}
+                className="flex-1 h-[52px] rounded-[14px] border border-[#E0E0E8] text-[14px] font-semibold text-[#888899] flex items-center justify-center disabled:opacity-40"
               >
                 Cancel
               </button>
               <button
                 onClick={deleteAll}
-                disabled={deleteInput !== 'DELETE'}
+                disabled={deleteInput !== 'DELETE' || deleting}
                 className="flex-1 h-[52px] rounded-[14px] bg-[#E24B4A] text-white text-[14px] font-semibold disabled:opacity-40 flex items-center justify-center"
               >
-                Delete
+                {deleting ? 'Deleting…' : 'Delete'}
               </button>
             </div>
           </div>

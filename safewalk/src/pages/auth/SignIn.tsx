@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../../lib/supabase';
+import { withTimeout } from '../../services/withTimeout';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { AuthPage } from '../../components/layout/AuthPage';
@@ -45,21 +46,25 @@ export default function SignIn() {
 
   const onSubmit = async ({ email, password }: FormData) => {
     setServerError('');
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      if (error.message.includes('Invalid login') || error.message.includes('credentials')) {
-        setServerError('Incorrect email or password.');
-      } else if (error.message.includes('Email not confirmed')) {
-        setServerError('Please confirm your email. Check your inbox or resend below.');
-      } else {
-        setServerError(error.message);
+    try {
+      const { data, error } = await withTimeout(supabase.auth.signInWithPassword({ email, password }), 10000);
+      if (error) {
+        if (error.message.includes('Invalid login') || error.message.includes('credentials')) {
+          setServerError('Incorrect email or password.');
+        } else if (error.message.includes('Email not confirmed')) {
+          setServerError('Please confirm your email. Check your inbox or resend below.');
+        } else {
+          setServerError(error.message);
+        }
+        return;
       }
-      return;
-    }
-    if (data.session) {
-      // Existing users signing in always go straight to the app.
-      // Only new users go through onboarding (handled by the sign-up flow).
-      navigate(from, { replace: true });
+      if (data.session) {
+        // Existing users signing in always go straight to the app.
+        // Only new users go through onboarding (handled by the sign-up flow).
+        navigate(from, { replace: true });
+      }
+    } catch {
+      setServerError("Couldn't connect. Check your connection and try again.");
     }
   };
 

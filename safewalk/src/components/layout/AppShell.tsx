@@ -1,8 +1,10 @@
 import { NavBar } from './NavBar';
+import { useWalkStore } from '../../store/walkStore';
 
 interface AppShellProps { children: React.ReactNode; }
 
 export function AppShell({ children }: AppShellProps) {
+  const isWalking = useWalkStore((s) => !!s.walk.sessionId);
   return (
     <>
       <a href="#main-content" className="skip-link">Skip to main content</a>
@@ -15,7 +17,7 @@ export function AppShell({ children }: AppShellProps) {
         >
           <main
             id="main-content"
-            className="flex-1 pb-[78px]"
+            className={`flex-1${isWalking ? '' : ' pb-[78px]'}`}
             tabIndex={-1}
             style={{ outline: 'none' }}
           >

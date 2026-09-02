@@ -1,0 +1,12 @@
+env: load .env
+env: export EXPO_PUBLIC_MAPBOX_TOKEN EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_WEB_BASE_URL
+Starting project at C:\Users\user\Downloads\SAFEWALK\safewalk-mobile
+Logs: C:\Users\user\Downloads\SAFEWALK\safewalk-mobile\.expo\dev\logs\start.log
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Waiting on http://localhost:8083
+
+An update for expo is available: 57.0.15 → ~57.0.18
+13 other packages may need updating. Run npx expo install --check for details.
+Logs for your project will appear below.

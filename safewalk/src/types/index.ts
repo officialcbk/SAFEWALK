@@ -27,6 +27,8 @@ export interface WalkSession {
   user_id: string;
   status: WalkStatus;
   destination: string | null;
+  route_coords: [number, number][] | null;
+  destination_coords: [number, number] | null;
   started_at: string;
   ended_at: string | null;
   duration_seconds: number | null;

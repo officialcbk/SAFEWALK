@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../../lib/supabase';
+import { withTimeout } from '../../services/withTimeout';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { AuthPage } from '../../components/layout/AuthPage';
@@ -13,16 +14,26 @@ type FormData = z.infer<typeof schema>;
 
 export default function ForgotPassword() {
   const [sent, setSent] = useState(false);
+  const [serverError, setServerError] = useState('');
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
 
   const onSubmit = async ({ email }: FormData) => {
-    await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    setSent(true);
+    setServerError('');
+    try {
+      // Never surfaces whether the email is actually registered (privacy),
+      // but a stalled connection still needs to resolve — otherwise the
+      // button is stuck loading forever with no escape.
+      await withTimeout(
+        supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` }),
+        10000,
+      );
+      setSent(true);
+    } catch {
+      setServerError("Couldn't connect. Check your connection and try again.");
+    }
   };
 
   return (
@@ -67,7 +78,7 @@ export default function ForgotPassword() {
               type="email"
               autoComplete="email"
               placeholder="you@email.com"
-              error={errors.email?.message}
+              error={errors.email?.message || serverError}
               {...register('email')}
             />
             <Button type="submit" fullWidth loading={isSubmitting}>Send reset link</Button>
