@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import * as Linking from 'expo-linking';
 import { supabase } from '../../lib/supabase';
+import { withTimeout } from '../../services/withTimeout';
 import { FullPageSpinner } from '../../components/ui/Spinner';
 import { AuthPage } from '../../components/layout/AuthPage';
 import { Text, View } from 'react-native';
@@ -44,22 +45,30 @@ export default function AuthCallback() {
     (async () => {
       const params = extractParams(url);
 
-      if (params.access_token && params.refresh_token) {
-        const { error: err } = await supabase.auth.setSession({
-          access_token: params.access_token,
-          refresh_token: params.refresh_token,
-        });
-        if (err) setError(err.message);
-        return;
-      }
+      try {
+        // Renders only a spinner below while this is pending, with no
+        // timeout — a stalled connection used to trap the user on an
+        // unrecoverable blank spinner after tapping a real magic link,
+        // no error and no way back to sign-in.
+        if (params.access_token && params.refresh_token) {
+          const { error: err } = await withTimeout(
+            supabase.auth.setSession({ access_token: params.access_token, refresh_token: params.refresh_token }),
+            10000,
+          );
+          if (err) setError(err.message);
+          return;
+        }
 
-      if (params.code) {
-        const { error: err } = await supabase.auth.exchangeCodeForSession(params.code);
-        if (err) setError(err.message);
-        return;
-      }
+        if (params.code) {
+          const { error: err } = await withTimeout(supabase.auth.exchangeCodeForSession(params.code), 10000);
+          if (err) setError(err.message);
+          return;
+        }
 
-      setError('This link is missing its login token. Try requesting a new one.');
+        setError('This link is missing its login token. Try requesting a new one.');
+      } catch {
+        setError("Couldn't connect. Check your connection and try again.");
+      }
     })();
   }, [url]);
 

@@ -3,23 +3,36 @@ import { Linking as RNLinking, Pressable, Text, View } from 'react-native';
 import { Link, useLocalSearchParams } from 'expo-router';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { supabase } from '../../lib/supabase';
+import { withTimeout } from '../../services/withTimeout';
 import { AuthPage } from '../../components/layout/AuthPage';
 import { MonoLogoMark } from '../../components/LogoMark';
+import Toast from 'react-native-toast-message';
 
 export default function CheckEmail() {
   const { email = '' } = useLocalSearchParams<{ email?: string }>();
   const [cooldown, setCooldown] = useState(0);
+  const [sending, setSending] = useState(false);
 
   const resend = async () => {
-    if (!email || cooldown > 0) return;
-    await supabase.auth.resend({ type: 'signup', email });
-    setCooldown(60);
-    const t = setInterval(() => {
-      setCooldown((s) => {
-        if (s <= 1) { clearInterval(t); return 0; }
-        return s - 1;
-      });
-    }, 1000);
+    // Only the post-send cooldown disabled the button before — a hang in
+    // the resend call itself never set that cooldown, so the button stayed
+    // tappable and could fire repeated concurrent resend requests.
+    if (!email || cooldown > 0 || sending) return;
+    setSending(true);
+    try {
+      await withTimeout(supabase.auth.resend({ type: 'signup', email }), 10000);
+      setCooldown(60);
+      const t = setInterval(() => {
+        setCooldown((s) => {
+          if (s <= 1) { clearInterval(t); return 0; }
+          return s - 1;
+        });
+      }, 1000);
+    } catch {
+      Toast.show({ type: 'error', text1: "Couldn't connect.", text2: 'Try again.' });
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -52,13 +65,13 @@ export default function CheckEmail() {
             </Pressable>
           )}
           <Pressable
-            disabled={cooldown > 0}
+            disabled={cooldown > 0 || sending}
             onPress={resend}
             className="h-[54px] rounded-2xl bg-fill items-center justify-center flex-row gap-2"
-            style={{ opacity: cooldown > 0 ? 0.5 : 1 }}
+            style={{ opacity: cooldown > 0 || sending ? 0.5 : 1 }}
           >
             <Text className="font-sans-semibold text-[15px] text-ink">
-              {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend email'}
+              {sending ? 'Sending…' : cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend email'}
             </Text>
           </Pressable>
         </View>

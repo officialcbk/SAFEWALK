@@ -16,6 +16,7 @@ export function Input({
   helperText,
   isPassword,
   secureTextEntry,
+  multiline,
   ...props
 }: InputProps) {
   const [showPassword, setShowPassword] = useState(false);
@@ -27,8 +28,10 @@ export function Input({
       )}
       <View className="relative justify-center">
         <TextInput
+          multiline={multiline}
           className={[
-            'w-full h-[52px] px-3.5 text-[15px] text-dark-text bg-white border rounded-md font-sans',
+            'w-full px-3.5 text-[15px] text-dark-text bg-white border rounded-md font-sans',
+            multiline ? 'min-h-[110px] py-3' : 'h-[52px]',
             isPassword ? 'pr-11' : '',
             error ? 'border-sos' : 'border-gray-border',
           ].join(' ')}

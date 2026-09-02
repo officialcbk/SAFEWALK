@@ -1,12 +1,11 @@
-import { useState } from 'react';
-import { Pressable, ScrollView, Share, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Share, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { useWalkStore } from '../../store/walkStore';
-import { Modal } from '../../components/ui/Modal';
+import { withTimeout } from '../../services/withTimeout';
 
 function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -54,8 +53,6 @@ export default function Settings() {
   const { user, profile, clear } = useAuthStore();
   const endWalk = useWalkStore((s) => s.endWalk);
   const router = useRouter();
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteInput, setDeleteInput] = useState('');
 
   const { data: profileData } = useQuery({
     queryKey: ['profile', user?.id],
@@ -83,7 +80,13 @@ export default function Settings() {
   const phone = profileData?.phone ?? profile?.phone ?? '';
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await withTimeout(supabase.auth.signOut(), 10000);
+    } catch {
+      // Clear local state and leave regardless — staying signed in locally
+      // because the network call hung would be worse than a stale server
+      // session the next sign-in naturally replaces.
+    }
     endWalk();
     clear();
     router.replace('/sign-in');
@@ -91,30 +94,22 @@ export default function Settings() {
 
   const exportData = async () => {
     if (!user) return;
-    const [{ data: p }, { data: c }, { data: w }] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', user.id),
-      supabase.from('trusted_contacts').select('*').eq('user_id', user.id),
-      supabase.from('walk_sessions').select('*').eq('user_id', user.id),
-    ]);
-    await Share.share({
-      title: 'Trayl data export',
-      message: JSON.stringify({ profile: p, contacts: c, walks: w }, null, 2),
-    });
-  };
-
-  const deleteAll = async () => {
-    if (!user || deleteInput !== 'DELETE') return;
-    await Promise.all([
-      supabase.from('trusted_contacts').delete().eq('user_id', user.id),
-      supabase.from('walk_sessions').delete().eq('user_id', user.id),
-    ]);
-    await supabase.functions.invoke('delete-account', { body: { user_id: user.id } });
-    await supabase.auth.signOut();
-    endWalk();
-    clear();
-    setShowDeleteConfirm(false);
-    router.replace('/sign-in');
-    Toast.show({ type: 'success', text1: 'All data deleted. Account removed.' });
+    try {
+      const [{ data: p }, { data: c }, { data: w }] = await withTimeout(
+        Promise.all([
+          supabase.from('profiles').select('*').eq('id', user.id),
+          supabase.from('trusted_contacts').select('*').eq('user_id', user.id),
+          supabase.from('walk_sessions').select('*').eq('user_id', user.id),
+        ]),
+        10000,
+      );
+      await Share.share({
+        title: 'Trayl data export',
+        message: JSON.stringify({ profile: p, contacts: c, walks: w }, null, 2),
+      });
+    } catch {
+      Toast.show({ type: 'error', text1: "Couldn't export your data.", text2: 'Try again.' });
+    }
   };
 
   const accountTiles = [
@@ -132,6 +127,7 @@ export default function Settings() {
       name: 'Refer friends', sub: 'Invite a walker, both get 1 month',
       onPress: () => Share.share({ message: 'Stay safe on your walks with Trayl — it alerts my contacts if I need help. Check it out!' }).catch(() => {}),
     },
+    { name: 'Feedback', sub: 'Tell us what to build next', onPress: () => router.push('/account-feedback') },
     { name: 'Help', sub: 'Guides and contact', onPress: () => router.push('/account-help') },
     { name: 'Legal', sub: 'Terms, privacy, licences', onPress: () => router.push('/account-legal') },
     { name: 'Sign out', sub: displayName, onPress: signOut },
@@ -197,43 +193,13 @@ export default function Settings() {
         </View>
         <View>
           <AccountTile name="Export my data" sub="Download everything we have on you" isFirst onPress={exportData} />
-          <AccountTile name="Delete all my data" sub="Permanently removes your account" onPress={() => setShowDeleteConfirm(true)} />
+          <AccountTile name="Delete all my data" sub="Permanently removes your account" onPress={() => router.push('/account-delete')} />
         </View>
 
         <Text style={{ fontFamily: 'IBMPlexMono_500Medium', fontSize: 9, letterSpacing: 0.9, textTransform: 'uppercase', color: 'rgba(0,0,0,.32)', paddingTop: 18, paddingBottom: 20, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,.09)', marginTop: 22 }}>
           Trayl v1.0.0 · PIPEDA compliant
         </Text>
       </ScrollView>
-
-      {/* Delete confirm modal */}
-      <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)}>
-        <Text className="text-base font-bold text-status-danger mb-3">Delete all data?</Text>
-        <Text className="text-[13px] text-gray-text leading-relaxed mb-4">
-          This will permanently delete your account, contacts, and walk history. Type DELETE to confirm.
-        </Text>
-        <TextInput
-          value={deleteInput}
-          onChangeText={setDeleteInput}
-          placeholder="Type DELETE"
-          autoCapitalize="characters"
-          className="w-full h-[52px] px-4 text-sm bg-white border border-sos rounded-xl mb-4"
-        />
-        <View className="flex-row gap-3">
-          <Pressable
-            onPress={() => setShowDeleteConfirm(false)}
-            className="flex-1 h-[52px] rounded-2xl border border-gray-border items-center justify-center"
-          >
-            <Text className="text-sm font-semibold text-gray-text">Cancel</Text>
-          </Pressable>
-          <Pressable
-            onPress={deleteAll}
-            disabled={deleteInput !== 'DELETE'}
-            className="flex-1 h-[52px] rounded-2xl bg-sos items-center justify-center disabled:opacity-40"
-          >
-            <Text className="text-sm font-semibold text-white">Delete</Text>
-          </Pressable>
-        </View>
-      </Modal>
     </View>
   );
 }

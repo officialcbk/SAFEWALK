@@ -6,6 +6,7 @@ import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
+import { withTimeout } from '../../services/withTimeout';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 
@@ -55,6 +56,7 @@ export default function OnboardingFlow() {
   const { user } = useAuthStore();
   const [step, setStep] = useState(0);
   const [isPrimary, setIsPrimary] = useState(true);
+  const [finishing, setFinishing] = useState(false);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ContactForm>({
     resolver: zodResolver(contactSchema),
@@ -62,20 +64,40 @@ export default function OnboardingFlow() {
   });
 
   const finish = async () => {
-    if (!user) return;
-    await supabase.from('profiles').update({ onboarding_completed: true }).eq('id', user.id);
-    navigate('/home', { replace: true });
+    if (!user || finishing) return;
+    setFinishing(true);
+    try {
+      // Neither "Allow location" nor "Not now" showed any loading state
+      // before — a hang here meant clicking either button did nothing at
+      // all, with no spinner, no error, and the user stuck on this screen.
+      await withTimeout(
+        supabase.from('profiles').update({ onboarding_completed: true }).eq('id', user.id),
+        10000,
+      );
+      navigate('/home', { replace: true });
+    } catch {
+      toast.error("Couldn't connect. Try again.");
+    } finally {
+      setFinishing(false);
+    }
   };
 
   const onSaveContact = async (data: ContactForm) => {
     if (!user) return;
-    const { error } = await supabase.from('trusted_contacts').insert({
-      user_id: user.id, full_name: data.full_name, phone: data.phone,
-      email: data.email || null, is_primary: isPrimary,
-    });
-    if (error) { toast.error('Could not save contact.'); return; }
-    toast.success(`${data.full_name} added.`);
-    setStep(2);
+    try {
+      const { error } = await withTimeout(
+        supabase.from('trusted_contacts').insert({
+          user_id: user.id, full_name: data.full_name, phone: data.phone,
+          email: data.email || null, is_primary: isPrimary,
+        }),
+        10000,
+      );
+      if (error) { toast.error('Could not save contact.'); return; }
+      toast.success(`${data.full_name} added.`);
+      setStep(2);
+    } catch {
+      toast.error("Couldn't connect. Try again.");
+    }
   };
 
   const requestLocation = () => {
@@ -204,10 +226,11 @@ export default function OnboardingFlow() {
           </p>
         </div>
 
-        <Button fullWidth onClick={requestLocation}>Allow location</Button>
+        <Button fullWidth loading={finishing} onClick={requestLocation}>Allow location</Button>
         <button
           onClick={finish}
-          className="w-full py-3 mt-1 text-[14px] font-semibold text-[#534AB7] text-center"
+          disabled={finishing}
+          className="w-full py-3 mt-1 text-[14px] font-semibold text-[#534AB7] text-center disabled:opacity-50"
         >
           Not now
         </button>

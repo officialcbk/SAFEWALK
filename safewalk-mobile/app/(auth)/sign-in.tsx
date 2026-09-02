@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { supabase } from '../../lib/supabase';
+import { withTimeout } from '../../services/withTimeout';
 import { AuthPage } from '../../components/layout/AuthPage';
 import { MonoLogoMark } from '../../components/LogoMark';
 import { FormInput } from '../../components/auth/FormInput';
@@ -26,17 +27,24 @@ export default function SignIn() {
 
   const onSubmit = async ({ email, password }: FormData) => {
     setServerError('');
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      if (error.message.includes('Invalid login') || error.message.includes('credentials')) {
-        setServerError('Incorrect email or password.');
-      } else if (error.message.includes('Email not confirmed')) {
-        setServerError('Please confirm your email. Check your inbox.');
-      } else {
-        setServerError(error.message);
+    try {
+      // react-hook-form's isSubmitting tracks this promise directly — a
+      // stalled connection used to leave the button stuck reading "Signing
+      // in…" forever with no error and no way to retry.
+      const { error } = await withTimeout(supabase.auth.signInWithPassword({ email, password }), 10000);
+      if (error) {
+        if (error.message.includes('Invalid login') || error.message.includes('credentials')) {
+          setServerError('Incorrect email or password.');
+        } else if (error.message.includes('Email not confirmed')) {
+          setServerError('Please confirm your email. Check your inbox.');
+        } else {
+          setServerError(error.message);
+        }
       }
+      // On success, AuthGate (root layout) picks up the new session and redirects.
+    } catch {
+      setServerError("Couldn't connect. Check your connection and try again.");
     }
-    // On success, AuthGate (root layout) picks up the new session and redirects.
   };
 
   return (

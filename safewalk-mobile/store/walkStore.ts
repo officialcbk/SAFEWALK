@@ -38,6 +38,12 @@ interface WalkStore {
   checkInsTriggered: number;
   // Whether SOS was triggered at any point this walk — real, counted.
   hadSOS: boolean;
+  // Contacts notified by the current SOS, if any — lives in the shared store
+  // (not component state) so an SOS fired from the lock-screen notification
+  // while Home isn't the focused screen still has something for Home to show
+  // once the app is reopened. Overlay visibility itself is walk.status ===
+  // 'sos_triggered', which is already shared state.
+  sosContacts: { name: string; phone: string }[];
 
   // Route geometry — [lng, lat][] (Mapbox convention)
   routeCoords: [number, number][] | null;
@@ -85,6 +91,7 @@ interface WalkStore {
   incrementCheckIns: () => void;
   incrementCheckInsTriggered: () => void;
   markSOS: () => void;
+  setSosContacts: (contacts: { name: string; phone: string }[]) => void;
   setRouteCoords: (coords: [number, number][] | null) => void;
   setDestinationCoords: (coords: [number, number] | null) => void;
   setDestinationFullAddress: (address: string | null) => void;
@@ -132,6 +139,7 @@ export const useWalkStore = create<WalkStore>()(
       checkInsCompleted: 0,
       checkInsTriggered: 0,
       hadSOS: false,
+      sosContacts: [],
       routeCoords: null,
       destinationCoords: null,
       destinationFullAddress: null,
@@ -153,6 +161,7 @@ export const useWalkStore = create<WalkStore>()(
       incrementCheckIns:  () => set((s) => ({ checkInsCompleted: s.checkInsCompleted + 1 })),
       incrementCheckInsTriggered: () => set((s) => ({ checkInsTriggered: s.checkInsTriggered + 1 })),
       markSOS:            () => set({ hadSOS: true }),
+      setSosContacts:     (contacts) => set({ sosContacts: contacts }),
       setRouteCoords:     (coords) => set({ routeCoords: coords }),
       setDestinationCoords: (coords) => set({ destinationCoords: coords }),
       setDestinationFullAddress: (address) => set({ destinationFullAddress: address }),
@@ -182,6 +191,7 @@ export const useWalkStore = create<WalkStore>()(
           checkInsCompleted: 0,
           checkInsTriggered: 0,
           hadSOS: false,
+          sosContacts: [],
           visitedPath: [],
           ...NAV_RESET,
           // navSteps is the one NAV_RESET field that must survive — it's the
@@ -217,6 +227,7 @@ export const useWalkStore = create<WalkStore>()(
           checkInsCompleted: 0,
           checkInsTriggered: 0,
           hadSOS: false,
+          sosContacts: [],
           routeCoords: null,
           destinationCoords: null,
           destinationFullAddress: null,

@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { supabase } from '../../lib/supabase';
+import { withTimeout } from '../../services/withTimeout';
 import { AuthPage } from '../../components/layout/AuthPage';
 import { MonoLogoMark } from '../../components/LogoMark';
 import { FormInput } from '../../components/auth/FormInput';
@@ -16,6 +17,7 @@ type FormData = z.infer<typeof schema>;
 
 export default function ForgotPassword() {
   const [sent, setSent] = useState(false);
+  const [serverError, setServerError] = useState('');
 
   const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -23,10 +25,19 @@ export default function ForgotPassword() {
   });
 
   const onSubmit = async ({ email }: FormData) => {
-    await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: Linking.createURL('callback'),
-    });
-    setSent(true);
+    setServerError('');
+    try {
+      // Never surfaces whether the email is actually registered (privacy),
+      // but a stalled connection still needs to resolve — otherwise the
+      // button is stuck reading "Sending…" forever with no escape.
+      await withTimeout(
+        supabase.auth.resetPasswordForEmail(email, { redirectTo: Linking.createURL('callback') }),
+        10000,
+      );
+      setSent(true);
+    } catch {
+      setServerError("Couldn't connect. Check your connection and try again.");
+    }
   };
 
   return (
@@ -73,7 +84,7 @@ export default function ForgotPassword() {
                   autoComplete="email"
                   textContentType="emailAddress"
                   placeholder="you@email.com"
-                  error={errors.email?.message}
+                  error={errors.email?.message || serverError}
                   value={field.value}
                   onChangeText={field.onChange}
                   onBlur={field.onBlur}

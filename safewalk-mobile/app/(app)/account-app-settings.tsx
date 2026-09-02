@@ -1,8 +1,48 @@
 import { useState } from 'react';
-import { Text, View } from 'react-native';
-import { AccountPageShell, ChoicePill, SegmentedTabs, SettingsRow, SettingsSection, useSettingsPrefs } from '../../components/account/SettingsPrefs';
+import { Text, TextInput, View } from 'react-native';
+import { AccountPageShell, ChoicePill, SegmentedTabs, SettingsRow, SettingsSection, useSettingsPrefs, type SettingsPrefs } from '../../components/account/SettingsPrefs';
 
 type SettingsTab = 'app' | 'route' | 'sharing';
+const CHECKIN_PRESETS = ['5', '10', '15'];
+
+function CheckInIntervalPicker({ prefs, setPrefs }: { prefs: SettingsPrefs; setPrefs: (fn: (p: SettingsPrefs) => SettingsPrefs) => void }) {
+  const isCustom = !CHECKIN_PRESETS.includes(prefs.checkinInterval);
+  const [customText, setCustomText] = useState(isCustom ? prefs.checkinInterval : '20');
+
+  return (
+    <View className="bg-gray-bg rounded-xl px-3.5 py-3">
+      <Text className="text-sm font-semibold text-dark-text mb-2">Check-in interval</Text>
+      <View className="flex-row flex-wrap gap-2">
+        {CHECKIN_PRESETS.map((v) => (
+          <ChoicePill key={v} label={`${v} min`} value={v} selected={prefs.checkinInterval === v} onPress={(checkinInterval) => setPrefs((p) => ({ ...p, checkinInterval }))} />
+        ))}
+        <ChoicePill
+          label="Custom"
+          value="custom"
+          selected={isCustom}
+          onPress={() => setPrefs((p) => ({ ...p, checkinInterval: customText && Number(customText) > 0 ? customText : '20' }))}
+        />
+      </View>
+      {isCustom && (
+        <View className="flex-row items-center gap-2 mt-3">
+          <TextInput
+            value={customText}
+            onChangeText={(text) => {
+              const digits = text.replace(/[^0-9]/g, '').slice(0, 3);
+              setCustomText(digits);
+              if (digits && Number(digits) > 0) setPrefs((p) => ({ ...p, checkinInterval: digits }));
+            }}
+            keyboardType="number-pad"
+            placeholder="Minutes"
+            placeholderTextColor="#888899"
+            className="w-20 h-11 px-3 text-sm text-dark-text bg-white border border-gray-border rounded-md"
+          />
+          <Text className="text-xs text-gray-text">minutes between check-ins</Text>
+        </View>
+      )}
+    </View>
+  );
+}
 
 export default function AccountAppSettings() {
   const { prefs, setPrefs } = useSettingsPrefs();
@@ -60,18 +100,7 @@ export default function AccountAppSettings() {
                 ]}
               />
             </View>
-            <View className="bg-gray-bg rounded-xl px-3.5 py-3">
-              <Text className="text-sm font-semibold text-dark-text mb-2">Check-in interval</Text>
-              <SegmentedTabs
-                value={prefs.checkinInterval}
-                onChange={(checkinInterval) => setPrefs((p) => ({ ...p, checkinInterval }))}
-                tabs={[
-                  { label: '5 min', value: '5' },
-                  { label: '10 min', value: '10' },
-                  { label: '15 min', value: '15' },
-                ]}
-              />
-            </View>
+            <CheckInIntervalPicker prefs={prefs} setPrefs={setPrefs} />
           </SettingsSection>
         )}
 

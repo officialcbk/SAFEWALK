@@ -70,12 +70,22 @@ export default function Search() {
   const [originCoords, setOriginCoords] = useState<[number, number] | null>(null);
   const [originMapboxId, setOriginMapboxId] = useState<string | null>(null); // resolved lazily on commit
   const originEditedRef = useRef(false);
+  // A single-line TextInput filled programmatically with a long address
+  // otherwise leaves its cursor wherever it last was (the end, on Android),
+  // which scrolls the field to show the tail of the address instead of the
+  // start. Forcing the selection to 0 right after autofill scrolls it back
+  // to the beginning; onSelectionChange immediately releases control so the
+  // user can still tap/select/type normally afterward.
+  const [originSelection, setOriginSelection] = useState<{ start: number; end: number } | undefined>(undefined);
 
   useEffect(() => {
     if (!currentLocation || originEditedRef.current) return;
     setOriginCoords([currentLocation.lng, currentLocation.lat]);
     reverseGeocode([currentLocation.lng, currentLocation.lat], { full: true }).then((text) => {
-      if (text && !originEditedRef.current) setOriginQuery(text);
+      if (text && !originEditedRef.current) {
+        setOriginQuery(text);
+        setOriginSelection({ start: 0, end: 0 });
+      }
     });
   }, [currentLocation]);
 
@@ -171,6 +181,8 @@ export default function Search() {
               </Text>
               <TextInput
                 value={originQuery}
+                selection={originSelection}
+                onSelectionChange={() => setOriginSelection(undefined)}
                 onFocus={() => setActiveField('origin')}
                 onChangeText={(v) => {
                   setOriginQuery(v);

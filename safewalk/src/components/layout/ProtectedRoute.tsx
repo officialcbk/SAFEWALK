@@ -3,6 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { FullPageSpinner } from '../ui/Spinner';
+import { withTimeout } from '../../services/withTimeout';
 import type { Profile } from '../../types';
 
 interface ProtectedRouteProps { children: React.ReactNode; }
@@ -17,11 +18,19 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const location = useLocation();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-      if (data.session && !profile) loadProfile(data.session.user.id, setProfile);
-    });
+    // A stalled connection here used to leave `loading` true forever — every
+    // route in the app is gated behind it, so a hang meant a blank spinner
+    // on every page load for every user, with no way out. On timeout, fall
+    // through as unauthenticated rather than hang; onAuthStateChange's own
+    // INITIAL_SESSION handler still corrects this the moment it actually
+    // fires, so this only matters when that never arrives either.
+    withTimeout(supabase.auth.getSession(), 10000)
+      .then(({ data }) => {
+        setSession(data.session);
+        setLoading(false);
+        if (data.session && !profile) loadProfile(data.session.user.id, setProfile);
+      })
+      .catch(() => setLoading(false));
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);

@@ -9,6 +9,10 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Generated native project (regenerate via `npx expo prebuild` / `expo run:android`)
+android/
+ios/
+
 # Native
 *.orig.*
 *.jks

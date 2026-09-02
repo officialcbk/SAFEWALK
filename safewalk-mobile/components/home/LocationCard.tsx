@@ -76,11 +76,10 @@ export function LocationCard({ location }: { location: LatLng | null }) {
           <View style={styles.dot} />
         </View>
       </View>
-      <View style={{ backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      <View style={{ backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 13 }}>
         <Text style={{ fontFamily: 'Archivo_400Regular', fontSize: 12.5, color: 'rgba(0,0,0,.6)' }} numberOfLines={1}>
           {label ?? 'Locating…'}
         </Text>
-        <Text style={{ fontFamily: 'Archivo_600SemiBold', fontSize: 11.5, color: '#0A0A0A' }}>Open map</Text>
       </View>
     </View>
   );

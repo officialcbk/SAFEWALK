@@ -16,7 +16,8 @@ export type SettingsPrefs = {
   appearance: 'system' | 'light' | 'dark';
   routePreference: 'fastest' | 'lit' | 'busy';
   defaultShareWindow: 'walk' | 'hour' | 'day';
-  checkinInterval: '5' | '10' | '15';
+  /** Minutes between check-ins, as a numeric string — free-form so users can set a custom interval, not just the 5/10/15 presets. */
+  checkinInterval: string;
   sosHoldSeconds: number;
   callPrimaryFirst: boolean;
   discreetMode: boolean;
@@ -189,13 +190,17 @@ export function ChoicePill<T extends string>({
   );
 }
 
-export function AccountPageShell({ title, children }: { title: string; children: ReactNode }) {
+export function AccountPageShell({ title, children, backTo = '/settings' }: { title: string; children: ReactNode; backTo?: '/settings' | '/profile' }) {
   const router = useRouter();
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
       <View style={{ paddingTop: 60, paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,.08)' }}>
-        <Pressable onPress={() => router.back()} style={{ width: 40, height: 40, justifyContent: 'center' }}>
+        {/* Every one of these screens is a hidden tab route, not a screen
+            nested in a Settings stack, so router.back() has no reliable
+            history to pop to and can land on Home instead. Navigate to the
+            known parent explicitly. */}
+        <Pressable onPress={() => router.navigate(backTo)} style={{ width: 40, height: 40, justifyContent: 'center' }}>
           <View style={{ width: 10, height: 10, borderLeftWidth: 2, borderBottomWidth: 2, borderColor: '#0A0A0A', transform: [{ rotate: '45deg' }], marginLeft: 5 }} />
         </Pressable>
         <Text style={{ fontFamily: 'Archivo_800ExtraBold', fontSize: 28, letterSpacing: -1.12, color: '#0A0A0A', marginTop: 8 }}>{title}</Text>

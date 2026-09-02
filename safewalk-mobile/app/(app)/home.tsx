@@ -61,7 +61,7 @@ function useHomeRecents(userId: string | undefined) {
     queryFn: async () => {
       const { data } = await supabase
         .from('walk_sessions')
-        .select('destination, distance_meters, duration_seconds, started_at')
+        .select('destination, destination_address, distance_meters, duration_seconds, started_at')
         .eq('user_id', userId!)
         .not('destination', 'is', null)
         .order('started_at', { ascending: false })
@@ -75,7 +75,9 @@ function useHomeRecents(userId: string | undefined) {
         recents.push({
           key: dest,
           name: dest.split(',')[0],
-          sub: dest,
+          // Older rows predate the destination_address column — fall back
+          // to the name so the subtitle is never blank.
+          sub: (row.destination_address as string | null) || dest,
           lastDistanceMeters: row.distance_meters,
           lastDurationSeconds: row.duration_seconds,
         });
@@ -117,6 +119,7 @@ export default function Home() {
     routeCoords, destinationCoords, addVisitedPoint,
     navSteps, navStepIndex, navRemainingMeters, navRemainingSeconds,
     isOffRoute, isRerouting, sharedContactIds, checkInsCompleted, incrementCheckIns, incrementCheckInsTriggered, markSOS,
+    sosContacts, setSosContacts,
     nearDestination, setNearDestination,
     setDestination, setDestinationCoords, setRouteCoords, setNavSteps,
     setDistance, setRouteDurationSeconds, setAlternateRouteCoords,
@@ -146,10 +149,17 @@ export default function Home() {
   const [endingWalk, setEndingWalk] = useState(false);
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [findingAlternate, setFindingAlternate] = useState(false);
-  const [showSosOverlay, setShowSosOverlay] = useState(false);
-  const [sosContacts, setSosContacts] = useState<{ name: string; phone: string }[]>([]);
+  // Shared with the lock-screen notification path — an SOS armed there while
+  // Home isn't focused still needs to render here the moment the app reopens.
+  const showSosOverlay = walk.status === 'sos_triggered';
 
   const [followUser, setFollowUser] = useState(true);
+  // The bottom sheet's real height varies with device inset (3-button nav
+  // bars eat extra space the BOTTOM_BAR_H estimate doesn't know about) and
+  // with which content it's showing (arrival prompt vs. off-route vs. normal
+  // nav card) — floating controls anchored to a fixed guess could end up
+  // rendering underneath it. Measure it and anchor to that instead.
+  const [bottomSheetHeight, setBottomSheetHeight] = useState(BOTTOM_BAR_H);
 
   const [showSafePlaces, setShowSafePlaces] = useState(false);
   const [safePlaces, setSafePlaces] = useState<SafePlace[]>([]);
@@ -380,9 +390,9 @@ export default function Home() {
     // Show the overlay (Cancel SOS / Call 911 are already live) before any
     // network call — a stalled connection must never delay this, and used
     // to leave the whole SOS flow silent with no visible feedback at all
-    // while these awaits hung. See withTimeout.ts.
+    // while these awaits hung. See withTimeout.ts. setStatus above already
+    // makes showSosOverlay true (it's derived from walk.status).
     setSosContacts([]);
-    setShowSosOverlay(true);
 
     const { contacts, alertError } = await triggerSOS({
       sessionId: walk.sessionId,
@@ -397,10 +407,10 @@ export default function Home() {
   };
 
   const handleCancelSOS = () => {
-    setShowSosOverlay(false);
     setShowCheckIn(false);
     setEscalationStage(0);
     setStatus('active');
+    setSosContacts([]);
     resetCheckIn();
     if (walk.sessionId) supabase.from('walk_sessions').update({ status: 'active' }).eq('id', walk.sessionId);
     Toast.show({ type: 'success', text1: "Glad you're safe. Emergency cancelled." });
@@ -657,7 +667,7 @@ export default function Home() {
         {/* ── Re-center pill — left edge, always available; snaps the camera
              back onto the route/user (e.g. after panning or the route-overview
              control has zoomed out) ──────────────────────────────────────── */}
-        <View className="absolute left-3" style={{ bottom: BOTTOM_BAR_H + 14, zIndex: 20 }}>
+        <View className="absolute left-3" style={{ bottom: bottomSheetHeight + 14, zIndex: 20 }}>
           <Pressable
             onPress={() => { setFollowUser(true); mapRef.current?.recenterOnUser(); }}
             accessibilityRole="button"
@@ -672,7 +682,7 @@ export default function Home() {
 
         {/* ── Safe places panel ───────────────────────────────────────────*/}
         {showSafePlaces && (
-          <View className="absolute left-0 right-0 px-4" style={{ bottom: BOTTOM_BAR_H + 8, zIndex: 20 }}>
+          <View className="absolute left-0 right-0 px-4" style={{ bottom: bottomSheetHeight + 8, zIndex: 20 }}>
             <View
               className="bg-white rounded-[18px] overflow-hidden"
               style={{ shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 20, shadowOffset: { width: 0, height: -4 }, elevation: 8 }}
@@ -724,6 +734,7 @@ export default function Home() {
         {/* ── Bottom sheet ─────────────────────────────────────────────── */}
         <View
           className="absolute bottom-0 left-0 right-0 bg-white"
+          onLayout={(e) => setBottomSheetHeight(e.nativeEvent.layout.height)}
           style={{
             borderTopLeftRadius: 22,
             borderTopRightRadius: 22,

@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../../lib/supabase';
+import { withTimeout } from '../../services/withTimeout';
 import { AuthPage } from '../../components/layout/AuthPage';
 import { MonoLogoMark } from '../../components/LogoMark';
 import { FormInput } from '../../components/auth/FormInput';
@@ -18,14 +20,23 @@ type FormData = z.infer<typeof schema>;
 
 export default function ResetPassword() {
   const router = useRouter();
+  const [serverError, setServerError] = useState('');
   const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { password: '', confirm: '' },
   });
 
   const onSubmit = async ({ password }: FormData) => {
-    const { error } = await supabase.auth.updateUser({ password });
-    if (!error) router.replace('/home');
+    setServerError('');
+    try {
+      const { error } = await withTimeout(supabase.auth.updateUser({ password }), 10000);
+      // Previously silent on failure — a rejected password or an expired
+      // reset link just re-enabled the button with zero explanation.
+      if (error) { setServerError(error.message); return; }
+      router.replace('/home');
+    } catch {
+      setServerError("Couldn't connect. Check your connection and try again.");
+    }
   };
 
   return (
@@ -61,7 +72,7 @@ export default function ResetPassword() {
                 autoComplete="new-password"
                 textContentType="newPassword"
                 placeholder="••••••••"
-                error={errors.confirm?.message}
+                error={errors.confirm?.message || serverError}
                 value={field.value}
                 onChangeText={field.onChange}
                 onBlur={field.onBlur}

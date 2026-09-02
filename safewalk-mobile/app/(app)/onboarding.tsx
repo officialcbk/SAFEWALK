@@ -11,6 +11,7 @@ import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
+import { withTimeout } from '../../services/withTimeout';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Toggle } from '../../components/ui/Toggle';
@@ -41,6 +42,7 @@ export default function Onboarding() {
   const { session, setProfile, profile } = useAuthStore();
   const [step, setStep] = useState(0);
   const [isPrimary, setIsPrimary] = useState(true);
+  const [finishing, setFinishing] = useState(false);
 
   const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<ContactForm>({
     resolver: zodResolver(contactSchema),
@@ -48,21 +50,41 @@ export default function Onboarding() {
   });
 
   const finish = async () => {
-    if (!session) return;
-    await supabase.from('profiles').update({ onboarding_completed: true }).eq('id', session.user.id);
-    if (profile) setProfile({ ...profile, onboarding_completed: true });
-    router.replace('/home');
+    if (!session || finishing) return;
+    setFinishing(true);
+    try {
+      // Neither "Allow location" nor "Not now" showed any loading state
+      // before — a hang here meant tapping either button did nothing at
+      // all, with no spinner, no error, and the user stuck on this screen.
+      await withTimeout(
+        supabase.from('profiles').update({ onboarding_completed: true }).eq('id', session.user.id),
+        10000,
+      );
+      if (profile) setProfile({ ...profile, onboarding_completed: true });
+      router.replace('/home');
+    } catch {
+      Toast.show({ type: 'error', text1: "Couldn't connect.", text2: 'Try again.' });
+    } finally {
+      setFinishing(false);
+    }
   };
 
   const onSaveContact = async (data: ContactForm) => {
     if (!session) return;
-    const { error } = await supabase.from('trusted_contacts').insert({
-      user_id: session.user.id, full_name: data.full_name, phone: data.phone,
-      email: data.email || null, is_primary: isPrimary,
-    });
-    if (error) { Toast.show({ type: 'error', text1: 'Could not save contact.' }); return; }
-    Toast.show({ type: 'success', text1: `${data.full_name} added.` });
-    setStep(2);
+    try {
+      const { error } = await withTimeout(
+        supabase.from('trusted_contacts').insert({
+          user_id: session.user.id, full_name: data.full_name, phone: data.phone,
+          email: data.email || null, is_primary: isPrimary,
+        }),
+        10000,
+      );
+      if (error) { Toast.show({ type: 'error', text1: 'Could not save contact.' }); return; }
+      Toast.show({ type: 'success', text1: `${data.full_name} added.` });
+      setStep(2);
+    } catch {
+      Toast.show({ type: 'error', text1: "Couldn't connect.", text2: 'Try again.' });
+    }
   };
 
   const requestLocation = async () => {
@@ -191,10 +213,10 @@ export default function Onboarding() {
   }
 
   // ── Step 3: Location permission ───────────────────────────────────────────
-  return <LocationStep onAllow={requestLocation} onSkip={finish} />;
+  return <LocationStep onAllow={requestLocation} onSkip={finish} loading={finishing} />;
 }
 
-function LocationStep({ onAllow, onSkip }: { onAllow: () => void; onSkip: () => void }) {
+function LocationStep({ onAllow, onSkip, loading }: { onAllow: () => void; onSkip: () => void; loading: boolean }) {
   const insets = useSafeAreaInsets();
   return (
     <View className="flex-1 justify-end" style={{ backgroundColor: 'rgba(40,36,80,0.85)' }}>
@@ -226,8 +248,8 @@ function LocationStep({ onAllow, onSkip }: { onAllow: () => void; onSkip: () => 
           </Text>
         </View>
 
-        <Button fullWidth onPress={onAllow}>Allow location</Button>
-        <Pressable onPress={onSkip} className="w-full py-3 mt-1">
+        <Button fullWidth loading={loading} onPress={onAllow}>Allow location</Button>
+        <Pressable onPress={onSkip} disabled={loading} className="w-full py-3 mt-1">
           <Text className="text-sm font-semibold text-purple-600 text-center">Not now</Text>
         </Pressable>
       </View>

@@ -7,6 +7,7 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
+import { withTimeout } from '../../services/withTimeout';
 
 export default function AccountSecurity() {
   const router = useRouter();
@@ -27,7 +28,7 @@ export default function AccountSecurity() {
     }
     setSaving(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password });
+      const { error } = await withTimeout(supabase.auth.updateUser({ password }), 10000);
       if (error) {
         Toast.show({ type: 'error', text1: 'Could not change password.', text2: error.message });
         return;
@@ -35,6 +36,8 @@ export default function AccountSecurity() {
       setPassword('');
       setConfirm('');
       Toast.show({ type: 'success', text1: 'Password changed.' });
+    } catch {
+      Toast.show({ type: 'error', text1: "Couldn't connect.", text2: 'Try again.' });
     } finally {
       setSaving(false);
     }
@@ -44,12 +47,14 @@ export default function AccountSecurity() {
     if (!user?.email) return;
     setSendingReset(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(user.email);
+      const { error } = await withTimeout(supabase.auth.resetPasswordForEmail(user.email), 10000);
       if (error) {
         Toast.show({ type: 'error', text1: 'Could not send reset link.', text2: error.message });
         return;
       }
       Toast.show({ type: 'success', text1: 'Reset link sent.', text2: user.email });
+    } catch {
+      Toast.show({ type: 'error', text1: "Couldn't connect.", text2: 'Try again.' });
     } finally {
       setSendingReset(false);
     }

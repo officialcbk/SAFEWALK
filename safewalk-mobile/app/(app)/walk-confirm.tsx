@@ -80,6 +80,7 @@ export default function WalkConfirm() {
           .insert({
             user_id: user.id,
             destination: walk.destination,
+            destination_address: destinationFullAddress,
             route_coords: routeCoords,
             destination_coords: destinationCoords,
           })

@@ -1,6 +1,6 @@
 import { ActivityIndicator, Pressable, Text, type PressableProps } from 'react-native';
 
-type Variant = 'primary' | 'ghost' | 'danger' | 'text';
+type Variant = 'primary' | 'ghost' | 'danger' | 'text' | 'dark' | 'ghost-dark';
 type Size = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends Omit<PressableProps, 'style'> {
@@ -16,6 +16,13 @@ const containerVariants: Record<Variant, string> = {
   ghost: 'bg-purple-50 border border-purple-100',
   danger: 'bg-sos',
   text: 'bg-transparent',
+  // Purple-free variants for the account section — a Tailwind utility
+  // conflict means overriding containerVariants.primary's bg via an
+  // appended className is not reliable (whichever color class the compiled
+  // stylesheet happens to define later wins, regardless of string order),
+  // so these need to be real variants rather than a className override.
+  dark: 'bg-ink',
+  'ghost-dark': 'bg-fill',
 };
 
 const textVariants: Record<Variant, string> = {
@@ -23,6 +30,8 @@ const textVariants: Record<Variant, string> = {
   ghost: 'text-purple-600',
   danger: 'text-white',
   text: 'text-purple-600',
+  dark: 'text-white',
+  'ghost-dark': 'text-ink',
 };
 
 const sizes: Record<Size, string> = {
@@ -64,7 +73,7 @@ export function Button({
       {loading && (
         <ActivityIndicator
           size="small"
-          color={variant === 'primary' || variant === 'danger' ? '#FFFFFF' : '#534AB7'}
+          color={variant === 'primary' || variant === 'danger' || variant === 'dark' ? '#FFFFFF' : variant === 'ghost-dark' ? '#0A0A0A' : '#534AB7'}
         />
       )}
       <Text className={['font-semibold', textVariants[variant], textSizes[size]].join(' ')}>

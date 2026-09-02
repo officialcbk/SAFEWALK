@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../../lib/supabase';
+import { withTimeout } from '../../services/withTimeout';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { AuthPage } from '../../components/layout/AuthPage';
@@ -32,20 +33,23 @@ export default function SignUp() {
 
   const onSubmit = async ({ full_name, email, password }: FormData) => {
     setServerError('');
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name } },
-    });
-    if (error) {
-      if (error.message.includes('already registered') || error.message.includes('already exists')) {
-        setServerError('An account with this email already exists.');
-      } else {
-        setServerError(error.message);
+    try {
+      const { error } = await withTimeout(
+        supabase.auth.signUp({ email, password, options: { data: { full_name } } }),
+        10000,
+      );
+      if (error) {
+        if (error.message.includes('already registered') || error.message.includes('already exists')) {
+          setServerError('An account with this email already exists.');
+        } else {
+          setServerError(error.message);
+        }
+        return;
       }
-      return;
+      navigate('/auth/check-email', { state: { email } });
+    } catch {
+      setServerError("Couldn't connect. Check your connection and try again.");
     }
-    navigate('/auth/check-email', { state: { email } });
   };
 
   const strength = password.length > 0 ? strengthInfo(password) : null;

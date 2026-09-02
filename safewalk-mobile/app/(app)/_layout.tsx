@@ -18,6 +18,10 @@ const CHROMELESS_ROUTES = new Set([
   'account-privacy',
   'account-help',
   'account-legal',
+  'profile-edit',
+  'profile-verify-phone',
+  'account-delete',
+  'account-feedback',
 ]);
 
 export default function AppTabsLayout() {
@@ -50,6 +54,10 @@ export default function AppTabsLayout() {
       <Tabs.Screen name="account-privacy" options={{ href: null, headerShown: false }} />
       <Tabs.Screen name="account-help" options={{ href: null, headerShown: false }} />
       <Tabs.Screen name="account-legal" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="profile-edit" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="profile-verify-phone" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="account-delete" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="account-feedback" options={{ href: null, headerShown: false }} />
     </Tabs>
   );
 }

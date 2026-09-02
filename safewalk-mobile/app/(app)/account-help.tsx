@@ -1,9 +1,35 @@
 import { useState } from 'react';
-import { Linking, Text, View } from 'react-native';
-import Toast from 'react-native-toast-message';
+import { Linking, Pressable, Text, View } from 'react-native';
 import { AccountPageShell, SegmentedTabs, SettingsActionRow, SettingsSection } from '../../components/account/SettingsPrefs';
 
 type HelpTab = 'walks' | 'safety' | 'support';
+
+const WALKS_FAQ = [
+  { q: 'How do I start a walk?', a: 'Enter a destination from Home, review your route and estimated arrival, choose which contacts to notify, then tap Start walk.' },
+  { q: 'What happens during check-ins?', a: "Trayl periodically asks you to confirm you're okay. Set how often in Account → Settings → Route → Check-in interval. Miss one and your trusted contacts are notified." },
+  { q: "What's in my arrival summary?", a: 'After you end a walk, you’ll see your total distance, time, and the check-ins you answered along the way, under History.' },
+  { q: 'Can I change my route mid-walk?', a: 'Search a new destination from the active walk screen and Trayl re-routes from your current location.' },
+] as const;
+
+const SAFETY_FAQ = [
+  { q: 'How does SOS work?', a: 'Hold the SOS button for the duration set in Account → Safety → SOS hold time. Your trusted contacts get an immediate alert with your live location.' },
+  { q: 'Can I test SOS without alerting anyone?', a: 'Yes — use Test SOS from the Account tab. No message is sent to anyone.' },
+  { q: 'What is Discreet mode?', a: "It keeps on-screen safety controls minimal and quiet — useful if you don't want using the app to draw attention. Toggle it in Account → Safety." },
+  { q: 'Who can see my location?', a: 'Only the trusted contacts you choose when starting a walk, and only for the duration of that walk.' },
+] as const;
+
+function FaqItem({ q, a }: { q: string; a: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Pressable onPress={() => setOpen((v) => !v)} className="bg-gray-bg rounded-xl px-3.5 py-3">
+      <View className="flex-row items-center justify-between gap-3">
+        <Text className="flex-1 text-sm font-semibold text-dark-text">{q}</Text>
+        <Text className="text-base text-gray-text">{open ? '−' : '+'}</Text>
+      </View>
+      {open && <Text className="text-[13px] text-gray-text leading-relaxed mt-2">{a}</Text>}
+    </Pressable>
+  );
+}
 
 export default function AccountHelp() {
   const [tab, setTab] = useState<HelpTab>('walks');
@@ -22,18 +48,14 @@ export default function AccountHelp() {
 
       <View style={{ marginTop: 18 }}>
         {tab === 'walks' && (
-          <SettingsSection label="Walk setup">
-            <SettingsActionRow title="Start a walk" sub="Choose a destination, review route, then pick watchers" value="Guide" onPress={() => Toast.show({ type: 'info', text1: 'Start from Home, then review route and watchers.' })} />
-            <SettingsActionRow title="Check-ins" sub="Trayl asks for confirmation during active walks" value="Guide" onPress={() => Toast.show({ type: 'info', text1: 'Missed check-ins can escalate to contacts.' })} />
-            <SettingsActionRow title="Arrival summaries" sub="Review route, time, and answered check-ins" value="Guide" onPress={() => Toast.show({ type: 'info', text1: 'Summaries appear after each completed walk.' })} />
+          <SettingsSection label="Frequently asked questions">
+            {WALKS_FAQ.map((item) => <FaqItem key={item.q} q={item.q} a={item.a} />)}
           </SettingsSection>
         )}
 
         {tab === 'safety' && (
-          <SettingsSection label="Emergency flows">
-            <SettingsActionRow title="Test SOS" sub="Run a silent test without contacting anyone" value="No alert" onPress={() => Toast.show({ type: 'info', text1: 'SOS test complete.', text2: 'No alert was sent.' })} />
-            <SettingsActionRow title="Discreet help" sub="Use quieter in-walk controls when you feel uneasy" value="Guide" onPress={() => Toast.show({ type: 'info', text1: 'Open help from an active walk for quiet options.' })} />
-            <SettingsActionRow title="Trusted contacts" sub="Keep primary and backup watchers up to date" value="Review" onPress={() => Toast.show({ type: 'info', text1: 'Open Contacts from the main tab to update watchers.' })} />
+          <SettingsSection label="Frequently asked questions">
+            {SAFETY_FAQ.map((item) => <FaqItem key={item.q} q={item.q} a={item.a} />)}
           </SettingsSection>
         )}
 

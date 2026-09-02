@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../../lib/supabase';
+import { withTimeout } from '../../services/withTimeout';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 
@@ -14,13 +16,22 @@ type FormData = z.infer<typeof schema>;
 
 export default function ResetPassword() {
   const navigate = useNavigate();
+  const [serverError, setServerError] = useState('');
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
 
   const onSubmit = async ({ password }: FormData) => {
-    const { error } = await supabase.auth.updateUser({ password });
-    if (!error) navigate('/home', { replace: true });
+    setServerError('');
+    try {
+      const { error } = await withTimeout(supabase.auth.updateUser({ password }), 10000);
+      // Previously silent on failure — a rejected password or an expired
+      // reset link just re-enabled the button with zero explanation.
+      if (error) { setServerError(error.message); return; }
+      navigate('/home', { replace: true });
+    } catch {
+      setServerError("Couldn't connect. Check your connection and try again.");
+    }
   };
 
   return (
@@ -35,7 +46,7 @@ export default function ResetPassword() {
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-[264px] flex flex-col gap-4">
           <Input label="New password" type="password" placeholder="Min. 8 characters" error={errors.password?.message} {...register('password')} />
-          <Input label="Confirm password" type="password" placeholder="••••••••" error={errors.confirm?.message} {...register('confirm')} />
+          <Input label="Confirm password" type="password" placeholder="••••••••" error={errors.confirm?.message || serverError} {...register('confirm')} />
           <Button type="submit" fullWidth loading={isSubmitting}>Set new password</Button>
         </form>
       </div>
