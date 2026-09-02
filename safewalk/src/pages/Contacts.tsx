@@ -7,6 +7,7 @@ import { Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
+import { withTimeout } from '../services/withTimeout';
 import type { TrustedContact } from '../types';
 import { Avatar } from '../components/ui/Avatar';
 import { Badge } from '../components/ui/Badge';
@@ -96,17 +97,26 @@ export default function Contacts() {
   const saveMutation = useMutation({
     mutationFn: async (data: FormData) => {
       if (!user) return;
+      // A hang here used to leave the Save button spinning forever with no
+      // error — withTimeout guarantees this mutation always eventually
+      // settles, so react-query's isPending can't get stuck true.
       if (isPrimary) {
-        await supabase.from('trusted_contacts').update({ is_primary: false }).eq('user_id', user.id);
+        await withTimeout(supabase.from('trusted_contacts').update({ is_primary: false }).eq('user_id', user.id), 10000);
       }
       if (editing) {
-        await supabase.from('trusted_contacts').update({
-          ...data, email: data.email || null, is_primary: isPrimary,
-        }).eq('id', editing.id);
+        await withTimeout(
+          supabase.from('trusted_contacts').update({
+            ...data, email: data.email || null, is_primary: isPrimary,
+          }).eq('id', editing.id),
+          10000,
+        );
       } else {
-        await supabase.from('trusted_contacts').insert({
-          user_id: user.id, ...data, email: data.email || null, is_primary: isPrimary,
-        });
+        await withTimeout(
+          supabase.from('trusted_contacts').insert({
+            user_id: user.id, ...data, email: data.email || null, is_primary: isPrimary,
+          }),
+          10000,
+        );
       }
     },
     onSuccess: (_, data) => {
@@ -119,13 +129,17 @@ export default function Contacts() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await supabase.from('trusted_contacts').delete().eq('id', id);
+      // ConfirmDialog disables its own Cancel button while this is pending
+      // — a hang here used to leave "Remove contact?" permanently open and
+      // undismissable, with no error and no way out.
+      await withTimeout(supabase.from('trusted_contacts').delete().eq('id', id), 10000);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contacts'] });
       setDeleteTarget(null);
       toast.success('Contact removed.');
     },
+    onError: () => toast.error("Couldn't remove contact. Try again."),
   });
 
   const remaining = 5 - contacts.length;

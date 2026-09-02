@@ -10,6 +10,7 @@ import { useGeolocation } from '../hooks/useGeolocation';
 import { useCheckIn } from '../hooks/useCheckIn';
 import { useNavigation } from '../hooks/useNavigation';
 import { getDirections } from '../services/directions';
+import { withTimeout } from '../services/withTimeout';
 import { formatNavDistance, formatNavDuration, humanizeInstruction } from '../services/navigation';
 import { getNearbyPlaces } from '../services/safePlaces';
 import type { SafePlace } from '../services/safePlaces';
@@ -450,6 +451,8 @@ export default function Home() {
   const [showCheckIn, setShowCheckIn]         = useState(false);
   const [showSosOverlay, setShowSosOverlay]   = useState(false);
   const [sosContacts, setSosContacts]         = useState<Array<{ name: string; phone: string }>>([]);
+  const [starting, setStarting]               = useState(false);
+  const [ending, setEnding]                   = useState(false);
 
   // Destination
   const [destinationText, setDestinationText] = useState(walk.destination ?? '');
@@ -662,41 +665,67 @@ export default function Home() {
 
   // ── Start walk ────────────────────────────────────────────────────────────
   const handleStart = async () => {
-    if (!user) return;
-    const { data: session, error } = await supabase
-      .from('walk_sessions')
-      .insert({ user_id: user.id, destination: destinationText || null })
-      .select()
-      .single();
-    if (error || !session) { toast.error("Couldn't start walk. Try again."); return; }
-    setSuggestions([]);
-    startWalk(session.id, session.share_token);
-    startTracking();
-    setFollowUser(true);
-    setSheetCollapsed(false);
-    setShowSafePlaces(false);
-    setSafePlaces([]);
-    setShowHelpMenu(false);
-    setArrivalDismissed(false);
-    if (destCoordsRef.current && locRef.current) {
-      fetchRoute([locRef.current.lng, locRef.current.lat], destCoordsRef.current);
+    if (!user || starting) return;
+    setStarting(true);
+    try {
+      // A stalled connection here used to leave the button silently dead —
+      // no error, no loading state, and repeated taps could fire duplicate
+      // inserts once/if they eventually resolved. See services/withTimeout.ts.
+      const { data: session, error } = await withTimeout(
+        supabase
+          .from('walk_sessions')
+          .insert({ user_id: user.id, destination: destinationText || null })
+          .select()
+          .single(),
+        10000,
+      );
+      if (error || !session) { toast.error("Couldn't start walk. Try again."); return; }
+      setSuggestions([]);
+      startWalk(session.id, session.share_token);
+      startTracking();
+      setFollowUser(true);
+      setSheetCollapsed(false);
+      setShowSafePlaces(false);
+      setSafePlaces([]);
+      setShowHelpMenu(false);
+      setArrivalDismissed(false);
+      if (destCoordsRef.current && locRef.current) {
+        fetchRoute([locRef.current.lng, locRef.current.lat], destCoordsRef.current);
+      }
+      stats.refetch();
+    } catch {
+      toast.error("Couldn't start walk. Try again.");
+    } finally {
+      setStarting(false);
     }
-    stats.refetch();
   };
 
   // ── End walk ──────────────────────────────────────────────────────────────
   const handleEnd = async () => {
+    if (ending) return;
+    setEnding(true);
     setShowEndConfirm(false);
     stopTracking();
     if (walk.sessionId) {
       const secs = walk.startedAt ? differenceInSeconds(new Date(), new Date(walk.startedAt)) : 0;
-      await supabase.from('walk_sessions').update({
-        status: 'completed',
-        ended_at: new Date().toISOString(),
-        duration_seconds: secs,
-        distance_meters: Math.round(walk.distanceMeters),
-      }).eq('id', walk.sessionId);
+      try {
+        // Ending the walk locally must never depend on this actually landing
+        // — a hang here used to leave the whole screen stuck showing the
+        // active walk (timer still running) with no error and no way out.
+        await withTimeout(
+          supabase.from('walk_sessions').update({
+            status: 'completed',
+            ended_at: new Date().toISOString(),
+            duration_seconds: secs,
+            distance_meters: Math.round(walk.distanceMeters),
+          }).eq('id', walk.sessionId),
+          10000,
+        );
+      } catch {
+        toast.error("Couldn't sync this walk — it ended on your device but may not be saved to history.");
+      }
     }
+    setEnding(false);
     endWalk();
     setCurrentLoc(null);
     setDestinationText('');
@@ -725,21 +754,53 @@ export default function Home() {
     if (!user || !walk.sessionId) return;
     setStatus('sos_triggered');
     setEscalationStage(2);
-    await supabase.from('walk_sessions').update({ status: 'sos_triggered' }).eq('id', walk.sessionId);
-    const { data: contacts } = await supabase
-      .from('trusted_contacts').select('full_name, phone').eq('user_id', user.id);
-    const list = (contacts ?? []).map((c) => ({ name: c.full_name, phone: c.phone }));
-    setSosContacts(list);
+    // Show the overlay before any network call — a stalled connection must
+    // never delay this. It used to gate on the contacts query resolving
+    // first, which left the whole SOS flow silently doing nothing (no
+    // overlay, no feedback at all) while these awaits hung.
+    setSosContacts([]);
     setShowSosOverlay(true);
-    if (list.length) {
-      const shareUrl = walk.shareToken ? `${window.location.origin}/track/${walk.shareToken}` : null;
-      const name = profile?.full_name || user.email || 'Someone';
-      const message = shareUrl
-        ? `EMERGENCY: ${name} has triggered an SOS on SafeWalk. Track their live location: ${shareUrl}`
-        : `EMERGENCY: ${name} has triggered an SOS on SafeWalk. Please check on them immediately.`;
-      await supabase.functions.invoke('send-alert', { body: { contacts: list, message } });
-    } else {
+
+    try {
+      await withTimeout(
+        supabase.from('walk_sessions').update({ status: 'sos_triggered' }).eq('id', walk.sessionId),
+        10000,
+      );
+    } catch {
+      // Non-fatal — proceed to alert contacts regardless of whether this sync landed.
+    }
+
+    let list: { name: string; phone: string }[] = [];
+    try {
+      const { data: contacts } = await withTimeout(
+        supabase.from('trusted_contacts').select('full_name, phone').eq('user_id', user.id),
+        10000,
+      );
+      list = (contacts ?? []).map((c) => ({ name: c.full_name, phone: c.phone }));
+    } catch {
+      toast.error("Couldn't load your contacts. Call your contacts directly if you can.");
+      return;
+    }
+    setSosContacts(list);
+
+    if (!list.length) {
       toast.error('No trusted contacts — add contacts so they can be alerted.');
+      return;
+    }
+
+    const shareUrl = walk.shareToken ? `${window.location.origin}/track/${walk.shareToken}` : null;
+    const name = profile?.full_name || user.email || 'Someone';
+    const message = shareUrl
+      ? `EMERGENCY: ${name} has triggered an SOS on SafeWalk. Track their live location: ${shareUrl}`
+      : `EMERGENCY: ${name} has triggered an SOS on SafeWalk. Please check on them immediately.`;
+    try {
+      // send-alert sources the actual SMS recipients itself, server-side,
+      // from this authenticated caller's own trusted_contacts rows — it
+      // doesn't trust a client-supplied contacts list. `list` here is only
+      // for the overlay's local display.
+      await withTimeout(supabase.functions.invoke('send-alert', { body: { message } }), 10000);
+    } catch {
+      toast.error('Alert may not have sent. Call your contacts directly if you can.');
     }
   };
 
@@ -1218,13 +1279,14 @@ export default function Home() {
               {/* Start walk button */}
               <button
                 onClick={handleStart}
-                className="w-full h-[50px] rounded-[14px] text-white font-bold text-[15px] active:scale-[0.98] flex items-center justify-center"
+                disabled={starting}
+                className="w-full h-[50px] rounded-[14px] text-white font-bold text-[15px] active:scale-[0.98] flex items-center justify-center disabled:opacity-60"
                 style={{
                   background: 'linear-gradient(135deg,#7F77DD,#534AB7)',
                   boxShadow: '0 4px 16px rgba(127,119,221,0.38)',
                 }}
               >
-                Start walk
+                {starting ? 'Starting…' : 'Start walk'}
               </button>
 
               {/* Quick stats */}

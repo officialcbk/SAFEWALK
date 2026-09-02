@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { useWalkStore } from '../store/walkStore';
+import { withTimeout } from '../services/withTimeout';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
 
@@ -83,6 +84,7 @@ export default function Settings() {
   const navigate = useNavigate();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
+  const [deleting, setDeleting] = useState(false);
   const [prefs, setPrefs] = useState({ checkin_reminders: true, walk_summary: true, auto_delete: true });
 
   const { data: profileData } = useQuery({
@@ -98,7 +100,13 @@ export default function Settings() {
   const initials = displayName.slice(0, 2).toUpperCase();
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await withTimeout(supabase.auth.signOut(), 10000);
+    } catch {
+      // Clear local state and leave regardless — staying signed in locally
+      // because the network call hung would be worse than a stale server
+      // session the next sign-in naturally replaces.
+    }
     endWalk();
     clear();
     navigate('/sign-in', { replace: true });
@@ -106,30 +114,48 @@ export default function Settings() {
 
   const exportData = async () => {
     if (!user) return;
-    const [{ data: p }, { data: c }, { data: w }] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', user.id),
-      supabase.from('trusted_contacts').select('*').eq('user_id', user.id),
-      supabase.from('walk_sessions').select('*').eq('user_id', user.id),
-    ]);
-    const blob = new Blob([JSON.stringify({ profile: p, contacts: c, walks: w }, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `safewalk-data-${Date.now()}.json`;
-    a.click();
+    try {
+      const [{ data: p }, { data: c }, { data: w }] = await withTimeout(
+        Promise.all([
+          supabase.from('profiles').select('*').eq('id', user.id),
+          supabase.from('trusted_contacts').select('*').eq('user_id', user.id),
+          supabase.from('walk_sessions').select('*').eq('user_id', user.id),
+        ]),
+        10000,
+      );
+      const blob = new Blob([JSON.stringify({ profile: p, contacts: c, walks: w }, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `safewalk-data-${Date.now()}.json`;
+      a.click();
+    } catch {
+      toast.error("Couldn't export your data. Try again.");
+    }
   };
 
   const deleteAll = async () => {
-    if (!user || deleteInput !== 'DELETE') return;
-    await Promise.all([
-      supabase.from('trusted_contacts').delete().eq('user_id', user.id),
-      supabase.from('walk_sessions').delete().eq('user_id', user.id),
-    ]);
-    await supabase.functions.invoke('delete-account', { body: { user_id: user.id } });
-    await supabase.auth.signOut();
-    endWalk();
-    clear();
-    navigate('/sign-in', { replace: true });
-    toast.success('All data deleted. Account removed.');
+    if (!user || deleteInput !== 'DELETE' || deleting) return;
+    setDeleting(true);
+    try {
+      // The edge function deletes everything (contacts, walks, profile,
+      // feedback, and the auth account itself) atomically server-side — it
+      // used to not exist at all, so this call silently failed and the app
+      // claimed success anyway while the real auth account lived on.
+      const { error } = await withTimeout(supabase.functions.invoke('delete-account'), 15000);
+      if (error) {
+        toast.error("Couldn't delete your account. Try again.");
+        return;
+      }
+      await supabase.auth.signOut();
+      endWalk();
+      clear();
+      navigate('/sign-in', { replace: true });
+      toast.success('All data deleted. Account removed.');
+    } catch {
+      toast.error("Couldn't delete your account. Try again.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -297,16 +323,17 @@ export default function Settings() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 h-[52px] rounded-[14px] border border-[#E0E0E8] text-[14px] font-semibold text-[#888899] flex items-center justify-center"
+                disabled={deleting}
+                className="flex-1 h-[52px] rounded-[14px] border border-[#E0E0E8] text-[14px] font-semibold text-[#888899] flex items-center justify-center disabled:opacity-40"
               >
                 Cancel
               </button>
               <button
                 onClick={deleteAll}
-                disabled={deleteInput !== 'DELETE'}
+                disabled={deleteInput !== 'DELETE' || deleting}
                 className="flex-1 h-[52px] rounded-[14px] bg-[#E24B4A] text-white text-[14px] font-semibold disabled:opacity-40 flex items-center justify-center"
               >
-                Delete
+                {deleting ? 'Deleting…' : 'Delete'}
               </button>
             </div>
           </div>

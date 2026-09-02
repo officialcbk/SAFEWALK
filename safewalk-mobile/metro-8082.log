@@ -1,0 +1,6 @@
+env: load .env
+env: export EXPO_PUBLIC_MAPBOX_TOKEN EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_WEB_BASE_URL
+Starting project at C:\Users\user\Downloads\SAFEWALK\safewalk-mobile
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
