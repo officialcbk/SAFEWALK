@@ -15,11 +15,12 @@ import { useNavigation } from '../../hooks/useNavigation';
 import { formatNavDistance, humanizeInstruction } from '../../services/navigation';
 import { formatPace, formatArrivalClock } from '../../services/eta';
 import { getNearbyPlaces, type SafePlace } from '../../services/safePlaces';
-import { buildShareUrl, triggerSOS } from '../../services/alert';
-import { dismissWalkNotification, showWalkNotification } from '../../services/sosNotification';
+import { buildShareUrl, MISSED_CHECKINS_THRESHOLD, triggerMissedCheckInAlert, triggerSOS } from '../../services/alert';
+import { dismissWalkNotification, showWalkNotification, updateWalkNotification } from '../../services/sosNotification';
 import { getDirections, searchOne } from '../../services/directions';
 import { withTimeout } from '../../services/withTimeout';
 import { MapView, type MapViewHandle } from '../../components/map/MapView';
+import { useSettingsPrefs } from '../../components/account/SettingsPrefs';
 import { HomeIdle } from '../../components/home/HomeIdle';
 import { SosButton } from '../../components/walk/SosButton';
 import { CheckInOverlay } from '../../components/walk/CheckInOverlay';
@@ -114,11 +115,13 @@ export default function Home() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, profile } = useAuthStore();
+  const { prefs } = useSettingsPrefs();
   const {
     walk, endWalk, setLocation, setStatus, setEscalationStage,
     routeCoords, destinationCoords, addVisitedPoint,
     navSteps, navStepIndex, navRemainingMeters, navRemainingSeconds,
     isOffRoute, isRerouting, sharedContactIds, checkInsCompleted, incrementCheckIns, incrementCheckInsTriggered, markSOS,
+    missedCheckInsInRow, incrementMissedCheckIns, resetMissedCheckIns,
     sosContacts, setSosContacts,
     nearDestination, setNearDestination,
     setDestination, setDestinationCoords, setRouteCoords, setNavSteps,
@@ -194,10 +197,15 @@ export default function Home() {
     locRef.current = ll;
     setLocation(ll);
     if (!walk.sessionId) return;
+    // This insert is what feeds the trusted-contact web page's live map —
+    // it had no error handling at all, so it could (and did) fail on every
+    // single walk with zero visibility.
     supabase.from('location_pings').insert({
       session_id: walk.sessionId, user_id: user?.id,
       lat: location.lat, lng: location.lng,
       bearing: location.bearing, speed: location.speed,
+    }).then(({ error }) => {
+      if (error) console.warn('[Trayl] location_pings insert failed:', error.message, error.details, error.hint);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location, walk.sessionId]);
@@ -249,6 +257,7 @@ export default function Home() {
     setShowCheckIn(false);
     setEscalationStage(0);
     resetCheckIn();
+    resetMissedCheckIns();
     // Triggered and completed increment together — this build doesn't yet
     // track a genuinely missed (never-answered) check-in as a terminal state,
     // so "answered" and "due" stay in lockstep rather than risking a
@@ -259,8 +268,30 @@ export default function Home() {
     Toast.show({ type: 'success', text1: "Great, glad you're safe." });
   };
 
-  const handleCheckInExpired = () => {
-    Toast.show({ type: 'info', text1: "Missed that one — we'll ask again shortly." });
+  // Miss MISSED_CHECKINS_THRESHOLD check-ins in a row and contacts actually
+  // get alerted — this used to be a promise the walk-confirm screen made in
+  // copy only.
+  const handleCheckInExpired = async () => {
+    incrementCheckInsTriggered();
+    incrementMissedCheckIns();
+    const missedNow = missedCheckInsInRow + 1;
+    if (missedNow < MISSED_CHECKINS_THRESHOLD) {
+      Toast.show({ type: 'info', text1: "Missed that one — we'll ask again shortly." });
+      return;
+    }
+    resetMissedCheckIns();
+    if (!user || !walk.sessionId) return;
+    const { alertError } = await triggerMissedCheckInAlert({
+      sessionId: walk.sessionId,
+      userId: user.id,
+      userName: profile?.full_name || user.email || 'Someone',
+      shareToken: walk.shareToken,
+    });
+    Toast.show(
+      alertError
+        ? { type: 'error', text1: `Missed ${MISSED_CHECKINS_THRESHOLD} check-ins — couldn't alert contacts.`, text2: alertError }
+        : { type: 'info', text1: `Missed ${MISSED_CHECKINS_THRESHOLD} check-ins in a row.`, text2: 'Your contacts have been alerted.' },
+    );
   };
 
   // ── Manual "Rejoin route" — off-route already auto-reroutes after a few
@@ -428,6 +459,13 @@ export default function Home() {
     : 100;
   const elapsedLabel = elapsedSeconds < 60 ? '< 1 min' : `${Math.round(elapsedSeconds / 60)} min`;
 
+  // Keep the lock-screen notification showing live turn-by-turn, same as the
+  // in-app nav card — not just a static "Trayl is tracking your walk".
+  useEffect(() => {
+    if (!isActive || !currentStep) return;
+    updateWalkNotification(currentStep, navRemainingMeters, navRemainingSeconds);
+  }, [isActive, currentStep, navRemainingMeters, navRemainingSeconds]);
+
   return (
     <View className="flex-1 bg-[#EEF1F6]">
       {showCheckIn && !showSosOverlay && (
@@ -460,6 +498,7 @@ export default function Home() {
           watchingContacts={watchingContacts}
           onShowMap={() => setOneHandedMode(false)}
           onSOS={handleSOS}
+          holdSeconds={prefs.sosHoldSeconds}
         />
       )}
 
@@ -770,7 +809,7 @@ export default function Home() {
                 >
                   <Text style={{ fontFamily: 'Archivo_700Bold', fontSize: 15, color: '#fff' }}>Rejoin route</Text>
                 </Pressable>
-                <SosButton onActivated={handleSOS} variant="filled" />
+                <SosButton onActivated={handleSOS} variant="filled" holdSeconds={prefs.sosHoldSeconds} />
               </View>
             </View>
           ) : (
@@ -809,7 +848,7 @@ export default function Home() {
                       </Svg>
                     )}
                   </Pressable>
-                  <SosButton onActivated={handleSOS} variant="filled" />
+                  <SosButton onActivated={handleSOS} variant="filled" holdSeconds={prefs.sosHoldSeconds} />
                 </View>
               </View>
 

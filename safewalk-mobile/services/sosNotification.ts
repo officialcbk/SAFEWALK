@@ -25,6 +25,9 @@ import { Platform } from 'react-native';
 import { useWalkStore } from '../store/walkStore';
 import { useAuthStore } from '../store/authStore';
 import { triggerSOS } from './alert';
+import { formatNavDistance, humanizeInstruction, maneuverIcon } from './navigation';
+import { formatArrivalClock } from './eta';
+import type { RouteStep } from './directions';
 
 // Android locks a channel's importance/sound/lockscreen-visibility after its
 // first creation — an app can never change them again, only the user can via
@@ -88,6 +91,30 @@ export async function showWalkNotification(destination: string | null) {
 
 export async function dismissWalkNotification() {
   await Notifications.dismissNotificationAsync(NOTIFICATION_ID);
+  lastNavText = null;
+}
+
+// Compared against on every call so a 3-second GPS tick that hasn't moved
+// the rounded distance/step doesn't repost an identical notification.
+let lastNavText: string | null = null;
+
+/**
+ * Refreshes the walk notification with live turn-by-turn info — same
+ * instruction + distance shown on the in-app one-handed nav screen, so the
+ * lock screen stays in sync with the walk without needing to unlock.
+ */
+export async function updateWalkNotification(
+  currentStep: RouteStep | null,
+  remainingMeters: number,
+  remainingSeconds: number,
+) {
+  if (!currentStep) return;
+  const title = `${maneuverIcon(currentStep.maneuverType, currentStep.maneuverModifier)} ${humanizeInstruction(currentStep)}`;
+  const body = `${formatNavDistance(currentStep.distance)} ahead · ${formatNavDistance(remainingMeters)} left · arrive ${formatArrivalClock(remainingSeconds)}`;
+  const text = `${title}\n${body}`;
+  if (text === lastNavText) return;
+  lastNavText = text;
+  await post({ title, body, categoryIdentifier: CATEGORY_ARMED });
 }
 
 async function fireSos() {

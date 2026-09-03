@@ -32,6 +32,13 @@ function EditForm({ userId, initial }: { userId: string; initial: ProfileRow }) 
   const [saving, setSaving] = useState(false);
 
   const saveEdit = async () => {
+    // date_of_birth is a Postgres `date` column — a free-text field lets
+    // people type anything, and an unparsable value used to fail the whole
+    // update with a generic "Could not save." and no clue why.
+    if (dateOfBirth && !/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) {
+      Toast.show({ type: 'error', text1: 'Date of birth must be in YYYY-MM-DD format.' });
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -44,13 +51,13 @@ function EditForm({ userId, initial }: { userId: string; initial: ProfileRow }) 
         accessibility_notes: accessibilityNotes || null,
       };
       const { error } = await withTimeout(supabase.from('profiles').update(payload).eq('id', userId), 10000);
-      if (error) { Toast.show({ type: 'error', text1: 'Could not save.' }); return; }
+      if (error) { Toast.show({ type: 'error', text1: 'Could not save.', text2: error.message }); return; }
       if (profile) setProfile({ ...profile, ...payload });
       qc.invalidateQueries({ queryKey: ['profile', userId] });
       Toast.show({ type: 'success', text1: 'Profile updated.' });
       router.navigate('/profile');
-    } catch {
-      Toast.show({ type: 'error', text1: "Couldn't connect.", text2: 'Try again.' });
+    } catch (e) {
+      Toast.show({ type: 'error', text1: "Couldn't connect.", text2: e instanceof Error ? e.message : 'Try again.' });
     } finally {
       setSaving(false);
     }

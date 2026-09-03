@@ -65,8 +65,8 @@ export default function AccountSecurity() {
       <SettingsSection label="Password">
         <Input label="New password" isPassword value={password} onChangeText={setPassword} placeholder="Min. 8 characters" autoComplete="new-password" textContentType="newPassword" />
         <Input label="Confirm password" isPassword value={confirm} onChangeText={setConfirm} placeholder="Re-enter password" autoComplete="new-password" textContentType="newPassword" />
-        <Button loading={saving} fullWidth className="bg-dark-text" onPress={changePassword}>Change password</Button>
-        <Button variant="ghost" loading={sendingReset} fullWidth onPress={sendResetLink}>Email reset link</Button>
+        <Button variant="dark" loading={saving} fullWidth onPress={changePassword}>Change password</Button>
+        <Button variant="ghost-dark" loading={sendingReset} fullWidth onPress={sendResetLink}>Email reset link</Button>
       </SettingsSection>
 
       <SettingsSection label="Verification">
