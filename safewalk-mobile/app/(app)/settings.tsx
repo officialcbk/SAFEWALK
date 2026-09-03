@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, Share, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Share, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
@@ -33,18 +34,23 @@ function Eyebrow({ children }: { children: string }) {
   );
 }
 
-function AccountTile({ name, sub, isFirst, onPress }: { name: string; sub: string; isFirst?: boolean; onPress: () => void }) {
+function AccountTile({ name, sub, isFirst, loading, onPress }: { name: string; sub: string; isFirst?: boolean; loading?: boolean; onPress: () => void }) {
   return (
     <Pressable
       onPress={onPress}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderTopWidth: isFirst ? 0 : 1, borderTopColor: 'rgba(0,0,0,.09)' }}
+      disabled={loading}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderTopWidth: isFirst ? 0 : 1, borderTopColor: 'rgba(0,0,0,.09)', opacity: loading ? 0.6 : 1 }}
     >
       <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#F1F0ED' }} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={{ fontFamily: 'Archivo_600SemiBold', fontSize: 14.5, letterSpacing: -0.22, color: '#0A0A0A' }}>{name}</Text>
         <Text style={{ fontFamily: 'Archivo_400Regular', fontSize: 11.5, color: 'rgba(0,0,0,.5)', marginTop: 6 }} numberOfLines={1}>{sub}</Text>
       </View>
-      <View style={{ width: 8, height: 8, borderTopWidth: 2, borderRightWidth: 2, borderColor: 'rgba(0,0,0,.3)', transform: [{ rotate: '45deg' }] }} />
+      {loading ? (
+        <ActivityIndicator size="small" color="#0A0A0A" />
+      ) : (
+        <View style={{ width: 8, height: 8, borderTopWidth: 2, borderRightWidth: 2, borderColor: 'rgba(0,0,0,.3)', transform: [{ rotate: '45deg' }] }} />
+      )}
     </Pressable>
   );
 }
@@ -79,7 +85,12 @@ export default function Settings() {
   const displayName = profileData?.full_name ?? profile?.full_name ?? user?.email ?? 'User';
   const phone = profileData?.phone ?? profile?.phone ?? '';
 
+  const [signingOut, setSigningOut] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
   const signOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
     try {
       await withTimeout(supabase.auth.signOut(), 10000);
     } catch {
@@ -93,7 +104,8 @@ export default function Settings() {
   };
 
   const exportData = async () => {
-    if (!user) return;
+    if (!user || exporting) return;
+    setExporting(true);
     try {
       const [{ data: p }, { data: c }, { data: w }] = await withTimeout(
         Promise.all([
@@ -107,8 +119,10 @@ export default function Settings() {
         title: 'Trayl data export',
         message: JSON.stringify({ profile: p, contacts: c, walks: w }, null, 2),
       });
-    } catch {
-      Toast.show({ type: 'error', text1: "Couldn't export your data.", text2: 'Try again.' });
+    } catch (e) {
+      Toast.show({ type: 'error', text1: "Couldn't export your data.", text2: e instanceof Error ? e.message : 'Try again.' });
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -130,7 +144,7 @@ export default function Settings() {
     { name: 'Feedback', sub: 'Tell us what to build next', onPress: () => router.push('/account-feedback') },
     { name: 'Help', sub: 'Guides and contact', onPress: () => router.push('/account-help') },
     { name: 'Legal', sub: 'Terms, privacy, licences', onPress: () => router.push('/account-legal') },
-    { name: 'Sign out', sub: displayName, onPress: signOut },
+    { name: 'Sign out', sub: displayName, onPress: signOut, loading: signingOut },
   ];
 
   return (
@@ -192,7 +206,7 @@ export default function Settings() {
           <Eyebrow>Your data</Eyebrow>
         </View>
         <View>
-          <AccountTile name="Export my data" sub="Download everything we have on you" isFirst onPress={exportData} />
+          <AccountTile name="Export my data" sub="Download everything we have on you" isFirst loading={exporting} onPress={exportData} />
           <AccountTile name="Delete all my data" sub="Permanently removes your account" onPress={() => router.push('/account-delete')} />
         </View>
 

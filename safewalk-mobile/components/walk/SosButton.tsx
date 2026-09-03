@@ -3,7 +3,6 @@ import { Pressable, Text, Vibration, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 
-const HOLD_MS = 3000;
 const TICK_MS = 50;
 
 interface SosButtonProps {
@@ -19,9 +18,10 @@ export function SosButton({ onActivated, disabled, size = 84, variant = 'circle'
   const radius = size * 0.381; // matches the original 32/84 ratio
   const circumference = 2 * Math.PI * radius;
   const inner = size * 0.857; // matches the original 72/84 ratio
+  const holdMs = holdSeconds * 1000;
   const [holding, setHolding] = useState(false);
   const [progress, setProgress] = useState(circumference);
-  const [countdown, setCountdown] = useState(3);
+  const [countdown, setCountdown] = useState(holdSeconds);
   const holdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startRef = useRef(0);
@@ -31,8 +31,8 @@ export function SosButton({ onActivated, disabled, size = 84, variant = 'circle'
     if (tickRef.current) clearInterval(tickRef.current);
     setHolding(false);
     setProgress(circumference);
-    setCountdown(3);
-  }, [circumference]);
+    setCountdown(holdSeconds);
+  }, [circumference, holdSeconds]);
 
   const start = useCallback(() => {
     if (disabled) return;
@@ -42,17 +42,17 @@ export function SosButton({ onActivated, disabled, size = 84, variant = 'circle'
 
     tickRef.current = setInterval(() => {
       const elapsed = Date.now() - startRef.current;
-      const pct = Math.min(elapsed / HOLD_MS, 1);
+      const pct = Math.min(elapsed / holdMs, 1);
       setProgress(circumference * (1 - pct));
-      setCountdown(Math.max(1, Math.ceil(3 - pct * 3)));
+      setCountdown(Math.max(1, Math.ceil(holdSeconds - pct * holdSeconds)));
     }, TICK_MS);
 
     holdRef.current = setTimeout(() => {
       cancel();
       Vibration.vibrate([100, 50, 100, 50, 200]);
       onActivated();
-    }, HOLD_MS);
-  }, [disabled, cancel, onActivated, circumference]);
+    }, holdMs);
+  }, [disabled, cancel, onActivated, circumference, holdMs, holdSeconds]);
 
   useEffect(() => () => cancel(), [cancel]);
 
@@ -83,7 +83,7 @@ export function SosButton({ onActivated, disabled, size = 84, variant = 'circle'
   }
 
   // Large filled red pill — the navigation bottom sheet's SOS control.
-  // Held rather than tapped; fires after HOLD_MS regardless of size/variant.
+  // Held rather than tapped; fires after holdMs regardless of size/variant.
   if (variant === 'filled') {
     return (
       <Pressable

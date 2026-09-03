@@ -128,7 +128,9 @@ export function HomeIdle({ currentLoc, standbyContacts, destination, recents, pi
                     </View>
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={{ fontFamily: 'Archivo_600SemiBold', fontSize: 14, color: '#0A0A0A' }} numberOfLines={1}>{r.name}</Text>
-                      <Text style={{ fontFamily: 'Archivo_400Regular', fontSize: 11.5, color: 'rgba(0,0,0,.5)', marginTop: 2 }} numberOfLines={1}>{r.sub}</Text>
+                      {r.sub !== r.name && (
+                        <Text style={{ fontFamily: 'Archivo_400Regular', fontSize: 11.5, color: 'rgba(0,0,0,.5)', marginTop: 2 }} numberOfLines={1}>{r.sub}</Text>
+                      )}
                     </View>
                     {picking && <ActivityIndicator size="small" color="#0A0A0A" />}
                   </Pressable>

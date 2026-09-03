@@ -15,6 +15,7 @@ import { useSettingsPrefs } from '../../components/account/SettingsPrefs';
 import { formatNavDistance, formatNavDuration, formatStepDistance, humanizeInstruction } from '../../services/navigation';
 import { formatArrivalClock } from '../../services/eta';
 import { withTimeout } from '../../services/withTimeout';
+import { MISSED_CHECKINS_THRESHOLD } from '../../services/alert';
 import type { TrustedContact } from '../../types';
 
 const CHECKIN_PRESETS = [3, 5, 10, 15];
@@ -221,8 +222,8 @@ export default function WalkConfirm() {
               })}
             </View>
             <Text style={{ fontFamily: 'Archivo_400Regular', fontSize: 12, color: 'rgba(0,0,0,.5)', marginTop: 10, lineHeight: 17 }}>
-              Trayl asks if you&apos;re okay every {checkInMinutes} min. Miss two in a row and{' '}
-              {primaryContact ? primaryContact.full_name.split(' ')[0] : 'your primary contact'} is called.
+              Trayl asks if you&apos;re okay every {checkInMinutes} min. Miss {MISSED_CHECKINS_THRESHOLD} in a row and{' '}
+              {primaryContact ? primaryContact.full_name.split(' ')[0] : 'your primary contact'} gets an SMS with your location.
             </Text>
           </View>
 
