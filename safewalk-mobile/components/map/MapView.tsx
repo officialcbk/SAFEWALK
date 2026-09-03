@@ -40,18 +40,18 @@ function lineString(coords: [number, number][]) {
 function UserMarker({ active, labeled, heading }: { active: boolean; labeled?: boolean; heading?: number | null }) {
   if (active) {
     return (
-      <View style={{ width: 120, height: 120, alignItems: 'center', justifyContent: 'center' }}>
-        <View style={{ position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(10,10,10,.15)' }} />
+      <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ position: 'absolute', width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(10,10,10,.15)' }} />
         <View style={{
-          width: 96, height: 96, borderRadius: 48, backgroundColor: '#fff',
+          width: 48, height: 48, borderRadius: 24, backgroundColor: '#fff',
           alignItems: 'center', justifyContent: 'center',
-          shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 6,
+          shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 6,
         }}>
           <View style={{
-            width: 84, height: 84, borderRadius: 42, backgroundColor: '#0A0A0A',
+            width: 42, height: 42, borderRadius: 21, backgroundColor: '#0A0A0A',
             alignItems: 'center', justifyContent: 'center', transform: [{ rotate: `${heading ?? 0}deg` }],
           }}>
-            <Svg width={40} height={40} viewBox="0 0 24 24">
+            <Svg width={20} height={20} viewBox="0 0 24 24">
               <SvgPath d="M12 3 19.5 19 12 15.5 4.5 19Z" fill="#fff" />
             </Svg>
           </View>
@@ -409,22 +409,20 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
           <LineLayer id="route-remaining-line" style={{ lineColor: '#0A0A0A', lineWidth: 5, lineJoin: 'round', lineCap: 'round' }} aboveLayerID="route-remaining-casing" />
         </ShapeSource>
       )}
-      {/* Summary mode — the actual walked GPS trail, dot-trail style, with a
-          start dot and a "stopped here" ring distinct from the planned route */}
+      {/* Summary mode — the actual walked GPS trail, dot-trail style. Only the
+          start gets its own marker here; the end of the trail is where the
+          user ended up, so it's marked by the same "You" puck used for a
+          live location elsewhere (fed via the `location` prop), not a
+          separate generic marker. */}
       {walkedGeoJSON && (
         <ShapeSource id="route-walked" shape={walkedGeoJSON}>
           <LineLayer id="route-walked-line" style={{ lineColor: '#0A0A0A', lineWidth: 7, lineCap: 'round', lineDasharray: [0.01, 1.6] }} />
         </ShapeSource>
       )}
       {summaryMode && walkedPath && walkedPath.length > 1 && (
-        <>
-          <PointAnnotation id="walk-start" coordinate={walkedPath[0]} anchor={{ x: 0.5, y: 0.5 }}>
-            <View style={styles.walkStartMarker} />
-          </PointAnnotation>
-          <PointAnnotation id="walk-end" coordinate={walkedPath[walkedPath.length - 1]} anchor={{ x: 0.5, y: 0.5 }}>
-            <View style={styles.walkEndMarker}><View style={styles.walkEndMarkerDot} /></View>
-          </PointAnnotation>
-        </>
+        <PointAnnotation id="walk-start" coordinate={walkedPath[0]} anchor={{ x: 0.5, y: 0.5 }}>
+          <View style={styles.walkStartMarker} />
+        </PointAnnotation>
       )}
       {/* Route walked — dot trail */}
       {completedGeoJSON && (
@@ -475,11 +473,6 @@ const styles = StyleSheet.create({
     width: 14, height: 14, borderRadius: 7, backgroundColor: '#0A0A0A', borderWidth: 2.5, borderColor: '#fff',
     shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 3,
   },
-  walkEndMarker: {
-    width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: '#0A0A0A', borderStyle: 'dashed',
-    alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,.6)',
-  },
-  walkEndMarkerDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#0A0A0A' },
   safePlaceMarker: {
     width: 34, height: 34, borderRadius: 17, borderWidth: 2.5, borderColor: 'white',
     alignItems: 'center', justifyContent: 'center',

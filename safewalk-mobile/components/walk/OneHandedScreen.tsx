@@ -16,6 +16,7 @@ export function OneHandedScreen({
   watchingContacts,
   onShowMap,
   onSOS,
+  holdSeconds = 3,
 }: {
   currentStep?: RouteStep | null;
   nextStep?: RouteStep | null;
@@ -24,6 +25,7 @@ export function OneHandedScreen({
   watchingContacts: TrustedContact[];
   onShowMap: () => void;
   onSOS: () => void;
+  holdSeconds?: number;
 }) {
   const insets = useSafeAreaInsets();
   return (
@@ -70,7 +72,7 @@ export function OneHandedScreen({
         </Text>
       </View>
 
-      <SosButton onActivated={onSOS} variant="block" holdSeconds={3} />
+      <SosButton onActivated={onSOS} variant="block" holdSeconds={holdSeconds} />
     </View>
   );
 }

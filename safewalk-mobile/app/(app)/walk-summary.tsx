@@ -47,6 +47,8 @@ export default function WalkSummary() {
   const km = summary.distanceMeters / 1000;
   const destinationLabel = summary.destination ?? 'your destination';
   const watchedNames = joinNames(summary.watchedByNames);
+  const lastPoint = summary.visitedPath.length ? summary.visitedPath[summary.visitedPath.length - 1] : null;
+  const endLocation = lastPoint ? { lng: lastPoint[0], lat: lastPoint[1] } : null;
 
   const handleShare = () => {
     const line = summary.endedEarly
@@ -60,7 +62,7 @@ export default function WalkSummary() {
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
         <View style={{ height: 260 }}>
           <MapView
-            location={null}
+            location={endLocation}
             routeCoords={summary.plannedRouteCoords}
             walkedPath={summary.visitedPath.length > 1 ? summary.visitedPath : null}
             destinationCoords={summary.destinationCoords}
