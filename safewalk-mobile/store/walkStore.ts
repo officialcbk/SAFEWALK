@@ -38,6 +38,11 @@ interface WalkStore {
   checkInsTriggered: number;
   // Whether SOS was triggered at any point this walk — real, counted.
   hadSOS: boolean;
+  // Consecutive missed (unanswered) check-ins — resets to 0 on any answer.
+  // At 2 in a row this fires an automatic "escalating" alert to contacts
+  // (see triggerMissedCheckInAlert), matching the check-in-interval screen's
+  // own copy about what missing two in a row actually does.
+  missedCheckInsInRow: number;
   // Contacts notified by the current SOS, if any — lives in the shared store
   // (not component state) so an SOS fired from the lock-screen notification
   // while Home isn't the focused screen still has something for Home to show
@@ -90,6 +95,8 @@ interface WalkStore {
   setCheckInTimer: (seconds: number) => void;
   incrementCheckIns: () => void;
   incrementCheckInsTriggered: () => void;
+  incrementMissedCheckIns: () => void;
+  resetMissedCheckIns: () => void;
   markSOS: () => void;
   setSosContacts: (contacts: { name: string; phone: string }[]) => void;
   setRouteCoords: (coords: [number, number][] | null) => void;
@@ -139,6 +146,7 @@ export const useWalkStore = create<WalkStore>()(
       checkInsCompleted: 0,
       checkInsTriggered: 0,
       hadSOS: false,
+      missedCheckInsInRow: 0,
       sosContacts: [],
       routeCoords: null,
       destinationCoords: null,
@@ -160,6 +168,8 @@ export const useWalkStore = create<WalkStore>()(
       setCheckInTimer:    (seconds) => set({ checkInSecondsLeft: seconds }),
       incrementCheckIns:  () => set((s) => ({ checkInsCompleted: s.checkInsCompleted + 1 })),
       incrementCheckInsTriggered: () => set((s) => ({ checkInsTriggered: s.checkInsTriggered + 1 })),
+      incrementMissedCheckIns: () => set((s) => ({ missedCheckInsInRow: s.missedCheckInsInRow + 1 })),
+      resetMissedCheckIns: () => set({ missedCheckInsInRow: 0 }),
       markSOS:            () => set({ hadSOS: true }),
       setSosContacts:     (contacts) => set({ sosContacts: contacts }),
       setRouteCoords:     (coords) => set({ routeCoords: coords }),
@@ -191,6 +201,7 @@ export const useWalkStore = create<WalkStore>()(
           checkInsCompleted: 0,
           checkInsTriggered: 0,
           hadSOS: false,
+          missedCheckInsInRow: 0,
           sosContacts: [],
           visitedPath: [],
           ...NAV_RESET,
@@ -227,6 +238,7 @@ export const useWalkStore = create<WalkStore>()(
           checkInsCompleted: 0,
           checkInsTriggered: 0,
           hadSOS: false,
+          missedCheckInsInRow: 0,
           sosContacts: [],
           routeCoords: null,
           destinationCoords: null,

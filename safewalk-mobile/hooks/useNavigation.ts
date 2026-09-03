@@ -8,6 +8,7 @@ import {
   findCurrentStepIndex,
   remainingRouteStats,
 } from '../services/navigation';
+import { updateWalkNotification } from '../services/sosNotification';
 
 const OFF_ROUTE_THRESHOLD_M = 40;   // metres
 const OFF_ROUTE_GRACE_COUNT = 3;    // consecutive readings before rerouting
@@ -43,6 +44,7 @@ export function useNavigation(isActive: boolean) {
     // 2. Remaining distance + ETA
     const { meters, seconds } = remainingRouteStats(stepIdx, navSteps);
     setNavRemaining(meters, seconds);
+    updateWalkNotification(navSteps[stepIdx] ?? null, meters, seconds);
 
     // 3. Arrival detection — haversine to destination pin
     if (destinationCoords) {
@@ -82,6 +84,7 @@ export function useNavigation(isActive: boolean) {
         setNavStepIndex(newIdx);
         const stats = remainingRouteStats(newIdx, result.steps);
         setNavRemaining(stats.meters, stats.seconds);
+        updateWalkNotification(result.steps[newIdx] ?? null, stats.meters, stats.seconds);
         setOffRoute(false);
       });
     }

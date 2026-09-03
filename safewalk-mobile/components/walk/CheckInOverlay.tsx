@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, Text, View } from 'react-native';
+import { Modal, Pressable, Text, Vibration, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
+import { MISSED_CHECKINS_THRESHOLD } from '../../services/alert';
 
 const WINDOW_SECONDS = 28;
+// Short-short-long — distinct from the SOS-confirm buzz and noticeable
+// through a pocket, since a check-in can be easy to miss silently.
+const ALERT_VIBRATION_PATTERN = [0, 120, 80, 120, 80, 260];
 
 export function CheckInOverlay({
   contactName,
@@ -22,6 +27,15 @@ export function CheckInOverlay({
     onExpireRef.current = onExpire;
   }, [onExpire]);
 
+  // A walker with the phone in a pocket can't see this modal appear — alert
+  // on every fresh prompt (mount) and every missed re-prompt (wrap-around
+  // below) the same way a phone call would.
+  const alertPresence = () => {
+    Vibration.vibrate(ALERT_VIBRATION_PATTERN);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+  };
+  useEffect(() => { alertPresence(); }, []);
+
   useEffect(() => {
     const id = setInterval(() => setSecondsLeft((s) => (s <= 1 ? WINDOW_SECONDS : s - 1)), 1000);
     return () => clearInterval(id);
@@ -37,7 +51,7 @@ export function CheckInOverlay({
   // without a second setState call in the same effect.
   const prevSecondsRef = useRef(secondsLeft);
   useEffect(() => {
-    if (secondsLeft > prevSecondsRef.current) onExpireRef.current();
+    if (secondsLeft > prevSecondsRef.current) { onExpireRef.current(); alertPresence(); }
     prevSecondsRef.current = secondsLeft;
   }, [secondsLeft]);
 
@@ -66,8 +80,8 @@ export function CheckInOverlay({
             Are you okay?
           </Text>
           <Text style={{ fontFamily: 'Archivo_400Regular', fontSize: 13, color: 'rgba(255,255,255,.6)', marginTop: 6, lineHeight: 18 }}>
-            If you don&apos;t answer, {contactName ?? 'your primary contact'} gets your location and a call in{' '}
-            <Text style={{ color: '#fff', fontFamily: 'Archivo_600SemiBold' }}>{secondsLeft} seconds</Text>.
+            Answer within <Text style={{ color: '#fff', fontFamily: 'Archivo_600SemiBold' }}>{secondsLeft} seconds</Text>. Miss {MISSED_CHECKINS_THRESHOLD} check-ins in a row and{' '}
+            {contactName ?? 'your trusted contacts'} get an SMS with your location.
           </Text>
 
           <View style={{ height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,.15)', marginTop: 16, overflow: 'hidden' }}>
